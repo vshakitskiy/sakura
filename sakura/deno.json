@@ -1,0 +1,17 @@
+{
+  "name": "@vsh/sakura",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./mod.ts",
+    "./error": "./error.ts",
+    "./res": "./res.ts",
+    "./router": "./router.ts",
+    "./server": "./server.ts"
+  },
+  "fmt": {
+    "semiColons": false
+  },
+  "publish": {
+		"exclude": ["*.test.ts"]
+	}
+}

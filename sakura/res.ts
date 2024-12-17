@@ -13,7 +13,7 @@ export class SakuraResponse {
     this.headers = headers
   }
 
-  return() {
+  return(): Response {
     return new Response(this.body, {
       status: this.status,
       headers: {
@@ -30,6 +30,6 @@ export const res = (
   // deno-lint-ignore no-explicit-any
   json?: Record<string, any> | number | null,
   headers?: HeadersInit,
-) => {
+): SakuraResponse => {
   return new SakuraResponse(status, json, headers)
 }

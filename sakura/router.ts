@@ -1,4 +1,4 @@
-import { SakuraResponse } from "./res.ts"
+import type { SakuraResponse } from "./res.ts"
 
 // TODO: ALL?
 export type Method = "GET" | "POST" | "DELETE" | "PUT"
@@ -45,7 +45,7 @@ export class Branch<InitSeed, CurrSeed> {
     this.mutation = mutation
   }
 
-  public static create<Context>() {
+  public static create<Context>(): Branch<Context, Context> {
     return new Branch<Context, Context>([], (seed) => seed)
   }
 
@@ -63,7 +63,7 @@ export class Branch<InitSeed, CurrSeed> {
 
   // TODO: implement merging branches + naming
 
-  get(path: string, handler: Handler<CurrSeed>) {
+  get(path: string, handler: Handler<CurrSeed>): Branch<InitSeed, CurrSeed> {
     const petal = createPetal<InitSeed, CurrSeed>(
       "GET",
       path,

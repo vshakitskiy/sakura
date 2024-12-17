@@ -1,13 +1,12 @@
 {
-  "name": "@sakura/core",
-  "version": "0.0.1",
   "tasks": {
     "dev": "deno run --watch --allow-net main.ts"
   },
   "fmt": {
     "semiColons": false
   },
+  "workspace": ["./sakura"],
   "imports": {
-    "@sakura/": "./package/"
+    "@sakura/": "./packages/"
   }
 }

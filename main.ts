@@ -1,8 +1,7 @@
 // HOW: structure repo?
 // HOW: @jsr packages?
-import { res } from "@sakura/res.ts"
-import { bloom, sakura } from "@sakura/server.ts"
-import { NotFound, Ok } from "@sakura/status.ts"
+import { res } from "./sakura/res.ts"
+import { bloom, sakura } from "./sakura/server.ts"
 
 // simple branch
 const { branch, seed } = sakura((req) => ({
@@ -25,19 +24,19 @@ const mainBranch = branch()
     ...seed,
     mutations: seed.mutations + 1,
   }))
-  .get("/", (_req, seed) => res(Ok, seed))
+  .get("/", (_req, seed) => res(200, seed))
   .with((seed) => ({
     ...seed,
     mutations: seed.mutations + 1,
     extra: seed.extra + 1,
   }))
-  .get("/extra", (_req, seed) => res(Ok, seed))
+  .get("/extra", (_req, seed) => res(200, seed))
 
 // start server
 bloom({
   seed,
   branch: mainBranch,
   unknownPetal: (_req, _seed) => {
-    return res(NotFound, { message: "Uknown Handler" })
+    return res(404, { message: "Uknown Handler" })
   },
 })

@@ -1,9 +1,22 @@
 import { Branch } from "./router.ts"
 import { SakuraError } from "./error.ts"
-import { SakuraResponse } from "./res.ts"
+import type { SakuraResponse } from "./res.ts"
 
 type GenSeed<Seed> = (req: Request) => Seed | Promise<Seed>
 
+/**
+ * Initialize branch function with the seed provided.
+ * @example
+ * ```ts
+ * const { branch, seed } = sakura(req => ({
+ *   req,
+ *   getSession: async () => {
+ *     // ...
+ *   },
+ *   ms: Date.now()
+ * }))
+ * ```
+ */
 export const sakura = <Seed>(seed: GenSeed<Seed>): {
   seed: GenSeed<Seed>
   branch: () => Branch<Seed, Seed>
@@ -17,6 +30,21 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
   TODO: on error handler + naming:
   HANDLER -> SakuraError -> "error handler" -> DEFAULT INTERNAL SERVER
 */
+/**
+ * Start Deno server with the options provided.
+ * @example
+ * ```ts
+ * const mainBranch = branch().get("/", (req, seed) => {
+ *   // ...
+ * })
+ *
+ * bloom({
+ *   seed,
+ *   branch: mainBranch,
+ *   // ...
+ * })
+ * ```
+ */
 export const bloom = <InitSeed, CurrSeed>({
   seed,
   branch,
@@ -28,7 +56,7 @@ export const bloom = <InitSeed, CurrSeed>({
     req: Request,
     seed: InitSeed,
   ) => Promise<SakuraResponse> | SakuraResponse
-}) => {
+}): void => {
   Deno.serve(async (req) => {
     const initSeed = await seed(req)
     const petal = branch.petals.find(({ path }) =>
