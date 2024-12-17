@@ -56,8 +56,8 @@ export const bloom = <InitSeed, CurrSeed>({
     req: Request,
     seed: InitSeed,
   ) => Promise<SakuraResponse> | SakuraResponse
-}): void => {
-  Deno.serve(async (req) => {
+}): Deno.HttpServer<Deno.NetAddr> => {
+  return Deno.serve(async (req) => {
     const initSeed = await seed(req)
     const petal = branch.petals.find(({ path }) =>
       path === new URL(req.url).pathname

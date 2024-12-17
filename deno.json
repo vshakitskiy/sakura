@@ -1,12 +1,21 @@
 {
+  "name": "@vsh/sakura",
+  "version": "0.0.2",
+  "exports": {
+    ".": "./package/mod.ts",
+    "./error": "./package/error.ts",
+    "./res": "./package/res.ts",
+    "./router": "./package/router.ts",
+    "./server": "./package/server.ts"
+  },
+  "exclude": ["./tests", ".rest"],
   "tasks": {
-    "dev": "deno run --watch --allow-net main.ts"
+    "test": "deno test --allow-net"
   },
   "fmt": {
     "semiColons": false
   },
-  "workspace": ["./sakura"],
   "imports": {
-    "@sakura/": "./packages/"
+    "@std/assert": "jsr:@std/assert@^1.0.9"
   }
 }
