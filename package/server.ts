@@ -1,4 +1,5 @@
 import { Branch } from "./router.ts"
+import type { Method } from "./router.ts"
 import { SakuraError } from "./error.ts"
 import type { SakuraResponse } from "./res.ts"
 
@@ -59,11 +60,10 @@ export const bloom = <InitSeed, CurrSeed>({
 }): Deno.HttpServer<Deno.NetAddr> => {
   return Deno.serve(async (req) => {
     const initSeed = await seed(req)
-    const petal = branch.petals.find(({ path }) =>
-      path === new URL(req.url).pathname
-    )
+    const url = await new URL(req.url)
+    const match = branch.match(req.method as Method, url.pathname)
 
-    if (!petal) {
+    if (!match) {
       try {
         return (await unknownPetal(req, initSeed)).return()
       } catch (error: unknown) {
@@ -72,8 +72,8 @@ export const bloom = <InitSeed, CurrSeed>({
     }
 
     try {
-      const currSeed = await petal.mutation(initSeed)
-      const res = await petal.handler(req, currSeed)
+      const currSeed = await match.petal.mutation(initSeed)
+      const res = await match.petal.handler(req, currSeed)
       return res.return()
     } catch (error: unknown) {
       return onHandleError(error)

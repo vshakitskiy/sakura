@@ -1,6 +1,6 @@
 {
   "name": "@vsh/sakura",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "exports": {
     ".": "./package/mod.ts",
     "./error": "./package/error.ts",
@@ -8,9 +8,12 @@
     "./router": "./package/router.ts",
     "./server": "./package/server.ts"
   },
-  "exclude": ["./tests", ".rest"],
+  "publish": {
+    "exclude": ["./tests", ".rest"]
+  },
   "tasks": {
-    "test": "deno test --allow-net"
+    "test": "deno test --allow-net",
+    "dry-run": "deno publish --dry-run"
   },
   "fmt": {
     "semiColons": false
