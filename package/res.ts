@@ -1,5 +1,9 @@
-export class SakuraResponse {
-  public readonly body: BodyInit | null
+/**
+ * Represents Response as an Error.
+ */
+export class SakuraError extends Error {
+  // deno-lint-ignore no-explicit-any
+  public readonly body: any
   public readonly status: number
   public readonly headers?: HeadersInit
   constructor(
@@ -8,28 +12,63 @@ export class SakuraResponse {
     json?: any,
     headers?: HeadersInit,
   ) {
+    super("Sakura Response")
     this.status = status
-    this.body = json ? JSON.stringify(json) : null
+    this.body = json
     this.headers = headers
-  }
-
-  return(): Response {
-    return new Response(this.body, {
-      status: this.status,
-      headers: {
-        "Content-type": "application/json",
-        ...this.headers,
-      },
-    })
   }
 }
 
-// TODO: function name
-export const res = (
+/**
+ * Throws Response as an Error. Use inside the seed mutation when you want to send Response early.
+ *
+ * @example
+ * ```ts
+ * import { SakuraError } from "@vsh/sakura"
+ *
+ * // Later on the branch...
+ * .with((seed) => {
+ *   if (!seed.getSession()) {
+ *     pluck(401, { message: "Unauthorized" })
+ *   }
+ *
+ *   return seed
+ * })
+ * ```
+ */
+export const pluck = (
   status: number,
   // deno-lint-ignore no-explicit-any
   json?: any,
   headers?: HeadersInit,
-): SakuraResponse => {
-  return new SakuraResponse(status, json, headers)
+): never => {
+  throw new SakuraError(status, json, headers)
+}
+
+/**
+ * Creates Response based on the arguments provided.
+ *
+ * @example
+ * ```ts
+ * import { SakuraError } from "@vsh/sakura"
+ *
+ * // Later on the branch...
+ * .get("/ping", () => fall(200, { message: "pong" }))
+ * ```
+ */
+export const fall = (
+  status: number,
+  // deno-lint-ignore no-explicit-any
+  json?: any,
+  headers?: HeadersInit,
+): Response => {
+  const body = json ? JSON.stringify(json) : null
+
+  return new Response(body, {
+    status,
+    headers: {
+      ...headers,
+      "Content-type": "application/json",
+    },
+  })
 }

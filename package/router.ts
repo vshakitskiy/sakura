@@ -1,49 +1,80 @@
-import type { SakuraResponse } from "./res.ts"
-
 // deno-lint-ignore no-explicit-any
 type PartialRecord<K extends keyof any, T> = {
   [P in K]?: T
 }
 
 // TODO: ALL?
+/**
+ * Request's method.
+ */
 export type Method = "GET" | "POST" | "DELETE" | "PUT"
 
+/**
+ * Mutates seed and returns it.
+ */
 export type Mutation<From, To> = (
   seed: From,
 ) => To | Promise<To>
 
 // TODO: replace params as "request meta" object
-export type Handler<CurrSeed> = (
+/**
+ * Function with the last mutation of the seed. Sends Response to the client.
+ */
+export type Petal<CurrSeed> = (
   req: Request,
   seed: CurrSeed,
-) => Promise<SakuraResponse> | SakuraResponse
+) => Promise<Response> | Response
 
-export type Petal<InitSeed, CurrSeed> = {
-  handler: Handler<CurrSeed>
+/**
+ * Contains the last mutation and response function
+ */
+export type Handler<InitSeed, CurrSeed> = {
+  petal: Petal<CurrSeed>
   mutation: Mutation<InitSeed, CurrSeed>
 }
 
-export type PetalsTree<InitSeed, CurrSeed> = {
-  nxt: Record<string, PetalsTree<InitSeed, CurrSeed>>
-  ptl?: PartialRecord<Method, Petal<InitSeed, CurrSeed>>
-  prm?: string
+/**
+ * Represents handlers as a tree.
+ */
+export type HandlersTree<InitSeed, CurrSeed> = {
+  next: Record<string, HandlersTree<InitSeed, CurrSeed>>
+  handler?: PartialRecord<Method, Handler<InitSeed, CurrSeed>>
+  param?: string
 }
 
+/**
+ * Creates new branch that appends to the blooming sakura later.
+ *
+ * @example
+ * ```ts
+ * // Not recommended, use sakura function instead
+ * const raw = Branch.create<{ req: Request }>()
+ * // Recommended
+ * const { seed, branch } = sakura((req) => ({ req }))
+ * const main = branch().get("/", () => fall(418))
+ *
+ * bloom({
+ *   seed,
+ *   branch: main
+ *   // ...
+ * })
+ * ```
+ */
 export class Branch<InitSeed, CurrSeed> {
-  petals: PetalsTree<InitSeed, CurrSeed>
+  handlers: HandlersTree<InitSeed, CurrSeed>
   mutation: Mutation<InitSeed, CurrSeed>
 
   constructor(
-    petals: PetalsTree<InitSeed, CurrSeed>,
+    handlers: HandlersTree<InitSeed, CurrSeed>,
     mutation: Mutation<InitSeed, CurrSeed>,
   ) {
-    this.petals = petals
+    this.handlers = handlers
     this.mutation = mutation
   }
 
   public static create<Context>(): Branch<Context, Context> {
     return new Branch<Context, Context>({
-      nxt: {},
+      next: {},
     }, (seed) => seed)
   }
 
@@ -51,7 +82,7 @@ export class Branch<InitSeed, CurrSeed> {
     mutation: Mutation<CurrSeed, MutatedSeed>,
   ): Branch<InitSeed, MutatedSeed> {
     return new Branch<InitSeed, MutatedSeed>(
-      this.petals as unknown as PetalsTree<InitSeed, MutatedSeed>,
+      this.handlers as unknown as HandlersTree<InitSeed, MutatedSeed>,
       async (seed) => {
         const currSeed = await this.mutation(seed)
         return mutation(currSeed)
@@ -63,67 +94,67 @@ export class Branch<InitSeed, CurrSeed> {
 
   public get(
     path: string,
-    handler: Handler<CurrSeed>,
+    petal: Petal<CurrSeed>,
   ): Branch<InitSeed, CurrSeed> {
-    return this.method("GET", path, handler)
+    return this.method("GET", path, petal)
   }
 
   public post(
     path: string,
-    handler: Handler<CurrSeed>,
+    petal: Petal<CurrSeed>,
   ): Branch<InitSeed, CurrSeed> {
-    return this.method("POST", path, handler)
+    return this.method("POST", path, petal)
   }
 
   // TODO: PUT, DELETE methods (ALL?)
   private method(
     method: Method,
     path: string,
-    handler: Handler<CurrSeed>,
+    petal: Petal<CurrSeed>,
   ): Branch<InitSeed, CurrSeed> {
-    const petal = { handler, mutation: this.mutation }
+    const handler = { petal, mutation: this.mutation }
 
     const parts = path.split("/").filter(Boolean)
-    let node = this.petals
+    let node = this.handlers
     for (const part of parts) {
       const isParam = part.startsWith(":")
       const key = isParam ? ":" : part
-      if (!node.nxt[key]) node.nxt[key] = { nxt: {} }
+      if (!node.next[key]) node.next[key] = { next: {} }
 
-      node = node.nxt[key]
-      if (isParam) node.prm = part.slice(1)
+      node = node.next[key]
+      if (isParam) node.param = part.slice(1)
     }
 
-    if (!node.ptl) {
-      node.ptl = {}
+    if (!node.handler) {
+      node.handler = {}
     }
-    node.ptl[method] = petal
+    node.handler[method] = handler
 
     return new Branch<InitSeed, CurrSeed>(
-      this.petals,
+      this.handlers,
       this.mutation,
     )
   }
 
   public match(method: Method, path: string): {
-    petal: Petal<InitSeed, CurrSeed>
+    handler: Handler<InitSeed, CurrSeed>
     params: Record<string, string>
   } | null {
-    let node = this.petals
+    let node = this.handlers
     const parts = path.split("/").filter(Boolean)
     const params: Record<string, string> = {}
 
     for (const part of parts) {
-      if (node.nxt[part]) node = node.nxt[part]
-      else if (node.nxt[":"]) {
-        node = node.nxt[":"]
-        params[node.prm!] = part
+      if (node.next[part]) node = node.next[part]
+      else if (node.next[":"]) {
+        node = node.next[":"]
+        params[node.param!] = part
       } else return null
     }
 
-    return node.ptl && node.ptl[method]
+    return node.handler && node.handler[method]
       ? {
-        petal: node.ptl[method],
+        handler: node.handler[method],
         params,
       }
       : null

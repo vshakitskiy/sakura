@@ -1,12 +1,16 @@
 import { Branch } from "./router.ts"
 import type { Method } from "./router.ts"
-import { SakuraError } from "./error.ts"
-import { res, type SakuraResponse } from "./res.ts"
+import { SakuraError } from "./res.ts"
+import { fall } from "./res.ts"
 
-type GenSeed<Seed> = (req: Request) => Seed | Promise<Seed>
+/**
+ * Creates request's inital seed.
+ */
+export type GenSeed<Seed> = (req: Request) => Seed | Promise<Seed>
 
 /**
  * Initialize branch function with the seed provided.
+ *
  * @example
  * ```ts
  * const { branch, seed } = sakura(req => ({
@@ -28,7 +32,8 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
 
 // TODO: fall(req, res, seed | meta + res) method (After request handler)
 /**
- * Start Deno server with the options provided.
+ * Starts server with the options provided.
+ *
  * @example
  * ```ts
  * const mainBranch = branch().get("/", (req, seed) => {
@@ -56,8 +61,8 @@ export const bloom = <InitSeed, CurrSeed>({
   unknown?: (
     req: Request,
     seed: InitSeed,
-  ) => Promise<SakuraResponse> | SakuraResponse
-  error?: (error: unknown) => Promise<SakuraResponse> | SakuraResponse
+  ) => Promise<Response> | Response
+  error?: (error: unknown) => Promise<Response> | Response
   log?: boolean
 }): Deno.HttpServer<Deno.NetAddr> => {
   return Deno.serve({
@@ -77,24 +82,24 @@ export const bloom = <InitSeed, CurrSeed>({
         const match = branch.match(req.method as Method, url.pathname)
 
         if (!match) {
-          if (unknown) return (await unknown(req, initSeed)).return()
-          else return res(404).return()
+          if (unknown) return await unknown(req, initSeed)
+          else return fall(404)
         }
 
-        const currSeed = await match.petal.mutation(initSeed)
-        const resp = await match.petal.handler(req, currSeed)
-        return resp.return()
+        const currSeed = await match.handler.mutation(initSeed)
+        const resp = await match.handler.petal(req, currSeed)
+        return resp
       } catch (err: unknown) {
         if (err instanceof SakuraError) {
-          return res(err.status, err.body).return()
+          return fall(err.status, err.body)
         } else {
           if (error) {
             try {
-              return (await error(err)).return()
+              return await error(err)
             } catch (_) {
-              return res(500).return()
+              return fall(500)
             }
-          } else return res(500).return()
+          } else return fall(500)
         }
       }
     })()

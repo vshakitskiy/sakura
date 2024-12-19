@@ -1,10 +1,10 @@
-import { bloom, res, sakura } from "@vsh/sakura"
+import { bloom, fall, sakura } from "@vsh/sakura"
 import { assertEquals, assertFalse } from "@std/assert"
 
 const baseSeed = () => sakura((req) => ({ req }))
 
-const ok = () => res(200, { message: "ok" })
-const empty = (status: number) => () => res(status)
+const ok = () => fall(200, { message: "ok" })
+const empty = (status: number) => () => fall(status)
 
 const req = async <T>(port: number, path: string) => {
   const req = await fetch(`http://localhost:${port}${path}`)
@@ -38,15 +38,15 @@ Deno.test("bloom config", async () => {
     .get("/unexpected", () => {
       throw new Error("Unexpected Error")
       // deno-lint-ignore no-unreachable
-      return res(200)
+      return fall(200)
     })
 
   const first = bloom({
     seed,
     branch: baseBranch,
     port: 8123,
-    unknown: () => res(404, { message: "unknown" }),
-    error: () => res(500, { message: "error" }),
+    unknown: () => fall(404, { message: "unknown" }),
+    error: () => fall(500, { message: "error" }),
     log: true,
   })
 
@@ -104,6 +104,6 @@ Deno.test("matching petals", async () => {
   const match = rewrite.match("GET", "/abc")
   if (!match) throw new Error("expected match")
   const req = new Request("http:localhost:8000/abc")
-  const res = await match.petal.handler(req, await seed(req))
+  const res = await match.handler.petal(req, await seed(req))
   assertEquals(res.status, 400)
 })
