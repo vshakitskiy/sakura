@@ -1,3 +1,18 @@
+/**
+ * Contains functions/classes related to working with routers.
+ *
+ * @example
+ * ```ts
+ * import { Branch } from "@vsh/sakura"
+ *
+ * const match = Branch.create<{ req: Request }>()
+ *  .get("/ping", () => fall(200, { message: "pong" }))
+ *  .match("GET", "/ping")
+ *
+ * @module
+ * ```
+ */
+
 // deno-lint-ignore no-explicit-any
 type PartialRecord<K extends keyof any, T> = {
   [P in K]?: T

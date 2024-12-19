@@ -1,4 +1,29 @@
 /**
+ * Contains functions/classes related to sending response.
+ *
+ * @example
+ * ```ts
+ * import { pluck, fall } from "@vsh/sakura"
+ *
+ * const branch =
+ *   .with((seed) => {
+ *     const session = seed.getSession()
+ *     if (!session) {
+ *       pluck(401, { message: "Unauthorized" })
+ *     }
+ *
+ *     return {
+ *       ...seed,
+ *       session
+ *     }
+ *   })
+ *   .get("/session", () => fall(200, session))
+ *
+ * @module
+ * ```
+ */
+
+/**
  * Represents Response as an Error.
  */
 export class SakuraError extends Error {

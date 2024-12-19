@@ -1,3 +1,25 @@
+/**
+ * Contains functions/classes related to creating and starting server.
+ *
+ * @example
+ * ```ts
+ * import { sakura, bloom } from "@vsh/sakura"
+ *
+ * const { seed, branch } = sakura((req) => ({ req }))
+ *
+ * const main = branch()
+ * // ...
+ *
+ * bloom({
+ *   seed,
+ *   branch: main,
+ *   port: 3000,
+ *   log: true
+ * })
+ * @module
+ * ```
+ */
+
 import { Branch } from "./router.ts"
 import type { Method } from "./router.ts"
 import { SakuraError } from "./res.ts"

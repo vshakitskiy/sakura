@@ -1,1 +1,1 @@
-GET http://localhost:8000/ HTTP/1.1
+GET http://localhost:4040/runtime HTTP/1.1
