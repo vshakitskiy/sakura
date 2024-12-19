@@ -3,6 +3,7 @@
 TODO: README
 
 ## Example
+
 ```ts
 import { bloom, fall, sakura } from "@vsh/sakura"
 
