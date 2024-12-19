@@ -1,6 +1,6 @@
 {
   "name": "@vsh/sakura",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "exports": {
     ".": "./package/mod.ts",
     "./error": "./package/error.ts",
