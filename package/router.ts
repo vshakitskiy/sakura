@@ -1,11 +1,12 @@
 import type { SakuraResponse } from "./res.ts"
 
-// TODO: ALL?
-export type Method = "GET" | "POST" | "DELETE" | "PUT"
-
+// deno-lint-ignore no-explicit-any
 type PartialRecord<K extends keyof any, T> = {
   [P in K]?: T
 }
+
+// TODO: ALL?
+export type Method = "GET" | "POST" | "DELETE" | "PUT"
 
 export type Mutation<From, To> = (
   seed: From,
@@ -87,11 +88,10 @@ export class Branch<InitSeed, CurrSeed> {
     for (const part of parts) {
       const isParam = part.startsWith(":")
       const key = isParam ? ":" : part
-      if (!node.nxt[key]) {
-        node.nxt[key] = isParam ? { nxt: {}, prm: part.slice(1) } : { nxt: {} }
-      }
+      if (!node.nxt[key]) node.nxt[key] = { nxt: {} }
 
       node = node.nxt[key]
+      if (isParam) node.prm = part.slice(1)
     }
 
     if (!node.ptl) {

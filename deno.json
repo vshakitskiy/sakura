@@ -12,6 +12,7 @@
     "exclude": ["./tests", ".rest"]
   },
   "tasks": {
+    "format": "deno fmt --check",
     "test": "deno test --allow-net",
     "dry-run": "deno publish --dry-run"
   },

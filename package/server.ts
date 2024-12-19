@@ -1,7 +1,7 @@
 import { Branch } from "./router.ts"
 import type { Method } from "./router.ts"
 import { SakuraError } from "./error.ts"
-import type { SakuraResponse } from "./res.ts"
+import { res, type SakuraResponse } from "./res.ts"
 
 type GenSeed<Seed> = (req: Request) => Seed | Promise<Seed>
 
@@ -27,10 +27,6 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
 })
 
 // TODO: fall(req, res, seed | meta + res) method (After request handler)
-/*
-  TODO: on error handler + naming:
-  HANDLER -> SakuraError -> "error handler" -> DEFAULT INTERNAL SERVER
-*/
 /**
  * Start Deno server with the options provided.
  * @example
@@ -49,58 +45,68 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
 export const bloom = <InitSeed, CurrSeed>({
   seed,
   branch,
-  unknownPetal,
+  port = 8000,
+  unknown,
+  error,
+  log,
 }: {
   seed: GenSeed<InitSeed>
   branch: Branch<InitSeed, CurrSeed>
-  unknownPetal: (
+  port?: number
+  unknown?: (
     req: Request,
     seed: InitSeed,
   ) => Promise<SakuraResponse> | SakuraResponse
+  error?: (error: unknown) => Promise<SakuraResponse> | SakuraResponse
+  log?: boolean
 }): Deno.HttpServer<Deno.NetAddr> => {
-  return Deno.serve(async (req) => {
-    const initSeed = await seed(req)
-    const url = await new URL(req.url)
-    const match = branch.match(req.method as Method, url.pathname)
-
-    if (!match) {
+  return Deno.serve({
+    port,
+    onListen: () =>
+      console.log(
+        `%c🌸 Blooming on %chttp://localhost:${port}/`,
+        "color: pink",
+        "color: pink; font-weight: bold",
+      ),
+  }, async (req) => {
+    const time = Date.now()
+    const url = new URL(req.url)
+    const resp = await (async () => {
       try {
-        return (await unknownPetal(req, initSeed)).return()
-      } catch (error: unknown) {
-        return onHandleError(error)
+        const initSeed = await seed(req)
+        const match = branch.match(req.method as Method, url.pathname)
+
+        if (!match) {
+          if (unknown) return (await unknown(req, initSeed)).return()
+          else return res(404).return()
+        }
+
+        const currSeed = await match.petal.mutation(initSeed)
+        const resp = await match.petal.handler(req, currSeed)
+        return resp.return()
+      } catch (err: unknown) {
+        if (err instanceof SakuraError) {
+          return res(err.status, err.body).return()
+        } else {
+          if (error) {
+            try {
+              return (await error(err)).return()
+            } catch (_) {
+              return res(500).return()
+            }
+          } else return res(500).return()
+        }
       }
+    })()
+    if (log) {
+      const ms = Date.now() - time
+      console.log(
+        `%c${req.method} %c${url.pathname} %c${resp.status} ${ms}ms`,
+        "color: blue",
+        "color: #fff",
+        "color: green",
+      )
     }
-
-    try {
-      const currSeed = await match.petal.mutation(initSeed)
-      const res = await match.petal.handler(req, currSeed)
-      return res.return()
-    } catch (error: unknown) {
-      return onHandleError(error)
-    }
+    return resp
   })
-}
-
-const onHandleError = (error: unknown) => {
-  if (error instanceof SakuraError) {
-    return new Response(error.body, {
-      status: error.status,
-      headers: {
-        "Content-Type": "application/json",
-        ...error.headers,
-      },
-    })
-  }
-  console.error(error)
-  return new Response(
-    JSON.stringify({
-      message: "Internal Server Error, try again later",
-    }),
-    {
-      status: 500,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
-  )
 }

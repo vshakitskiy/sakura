@@ -1,15 +1,15 @@
 export class SakuraResponse {
-  public readonly body: BodyInit
+  public readonly body: BodyInit | null
   public readonly status: number
   public readonly headers?: HeadersInit
   constructor(
     status: number,
     // deno-lint-ignore no-explicit-any
-    json?: Record<string, any> | number | null,
+    json?: any,
     headers?: HeadersInit,
   ) {
     this.status = status
-    this.body = JSON.stringify(json ?? undefined)
+    this.body = json ? JSON.stringify(json) : null
     this.headers = headers
   }
 
@@ -28,7 +28,7 @@ export class SakuraResponse {
 export const res = (
   status: number,
   // deno-lint-ignore no-explicit-any
-  json?: Record<string, any> | number | null,
+  json?: any,
   headers?: HeadersInit,
 ): SakuraResponse => {
   return new SakuraResponse(status, json, headers)
