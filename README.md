@@ -1,6 +1,6 @@
 # Sakura 🌸 (WIP)
 
-TODO: README
+![PREVIEW](./preview.png)
 
 ## Example
 
@@ -19,10 +19,7 @@ const { branch, seed } = sakura((req) => ({
 // Create branch with /ping & /runtime endpoints
 const main = branch()
   .get("/ping", () => fall(200, { message: "pong" }))
-  .get("/runtime", (_, { runtime }) => {
-    console.log(Date.now())
-    return fall(200, { runtime })
-  })
+  .get("/runtime", (_, { runtime }) => fall(200, { runtime }))
 
 // start the server
 bloom({
