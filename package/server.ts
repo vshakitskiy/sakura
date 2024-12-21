@@ -70,27 +70,29 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
  * ```
  */
 export const bloom = <InitSeed, CurrSeed>({
-  seed,
+  seed: init,
   branch,
   port = 8000,
   unknown,
   error,
-  log,
+  logger,
+  quiet,
 }: {
   seed: GenSeed<InitSeed>
   branch: Branch<InitSeed, CurrSeed>
   port?: number
-  unknown?: (
-    req: Request,
-    seed: InitSeed,
-  ) => Promise<Response> | Response
-  error?: (error: unknown) => Promise<Response> | Response
-  log?: boolean
+  unknown?: ({ req, seed }: {
+    req: Request
+    seed: InitSeed
+  }) => Promise<Response> | Response
+  error?: ({ error }: { error: unknown }) => Promise<Response> | Response
+  logger?: boolean
+  quiet?: boolean
 }): Deno.HttpServer<Deno.NetAddr> => {
   return Deno.serve({
     port,
     onListen: () =>
-      console.log(
+      quiet || console.log(
         `%c🌸 Blooming on %chttp://localhost:${port}/`,
         "color: pink",
         "color: pink; font-weight: bold",
@@ -100,16 +102,36 @@ export const bloom = <InitSeed, CurrSeed>({
     const url = new URL(req.url)
     const resp = await (async () => {
       try {
-        const initSeed = await seed(req)
+        const initSeed = await init(req)
         const match = branch.match(req.method as Method, url.pathname)
 
         if (!match) {
-          if (unknown) return await unknown(req, initSeed)
-          else return fall(404)
+          if (unknown) return await unknown({ req, seed: initSeed })
+          else return fall(404, { message: "not found" })
+        }
+        const { params: p, handler: { mutation, petal, z } } = match
+        const seed = await mutation(initSeed)
+
+        let query: {
+          // deno-lint-ignore no-explicit-any
+          [x: string]: any
+        } = {}
+        for (const [key, val] of url.searchParams) {
+          query[key] = val
+        }
+        let params = p
+
+        if (z) {
+          if (z.params) params = z.params.parse(params)
+          if (z.query) query = z.query.parse(query)
         }
 
-        const currSeed = await match.handler.mutation(initSeed)
-        const resp = await match.handler.petal(req, currSeed)
+        const resp = await petal({
+          req,
+          seed,
+          params,
+          query,
+        })
         return resp
       } catch (err: unknown) {
         if (err instanceof SakuraError) {
@@ -117,15 +139,15 @@ export const bloom = <InitSeed, CurrSeed>({
         } else {
           if (error) {
             try {
-              return await error(err)
+              return await error({ error: err })
             } catch (_) {
-              return fall(500)
+              return fall(500, { message: "internal server error" })
             }
-          } else return fall(500)
+          } else return fall(500, { message: "internal server error" })
         }
       }
     })()
-    if (log) {
+    if (logger) {
       const ms = Date.now() - time
       console.log(
         `%c${req.method} %c${url.pathname} %c${resp.status} ${ms}ms`,
