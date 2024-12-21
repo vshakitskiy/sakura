@@ -1,3 +1,4 @@
+import type { z, ZodObject, ZodRawShape } from "zod"
 /**
  * Contains functions/classes related to working with routers.
  *
@@ -13,10 +14,12 @@
  * ```
  */
 
-// deno-lint-ignore no-explicit-any
 type PartialRecord<K extends keyof any, T> = {
   [P in K]?: T
 }
+
+export type ExtractSeed<T> = T extends Branch<any, infer CurrSeed> ? CurrSeed
+  : never
 
 // TODO: ALL?
 /**
@@ -31,13 +34,25 @@ export type Mutation<From, To> = (
   seed: From,
 ) => To | Promise<To>
 
-// TODO: replace params as "request meta" object
+// TODO: change description
 /**
  * Function with the last mutation of the seed. Sends Response to the client.
  */
-export type Petal<CurrSeed> = (
-  req: Request,
-  seed: CurrSeed,
+export type Petal<
+  CurrSeed,
+  Params = {
+    [x: string]: any
+  },
+  Query = {
+    [x: string]: any
+  },
+> = (
+  { req, seed, params }: {
+    req: Request
+    seed: CurrSeed
+    params: Params
+    query: Query
+  },
 ) => Promise<Response> | Response
 
 /**
@@ -46,6 +61,10 @@ export type Petal<CurrSeed> = (
 export type Handler<InitSeed, CurrSeed> = {
   petal: Petal<CurrSeed>
   mutation: Mutation<InitSeed, CurrSeed>
+  z?: {
+    params?: ZodObject<ZodRawShape>
+    query?: ZodObject<ZodRawShape>
+  }
 }
 
 /**
@@ -107,27 +126,53 @@ export class Branch<InitSeed, CurrSeed> {
 
   // TODO: implement merging branches + naming
 
-  public get(
+  public get<
+    Params extends ZodObject<ZodRawShape>,
+    Query extends ZodObject<ZodRawShape>,
+  >(
     path: string,
-    petal: Petal<CurrSeed>,
+    petal: Petal<
+      CurrSeed,
+      z.infer<Params>,
+      z.infer<Query>
+    >,
+    z?: {
+      params?: Params
+      query?: Query
+    },
   ): Branch<InitSeed, CurrSeed> {
-    return this.method("GET", path, petal)
+    return this.method("GET", path, petal, z)
   }
 
-  public post(
+  public post<
+    Params extends ZodObject<ZodRawShape>,
+    Query extends ZodObject<ZodRawShape>,
+  >(
     path: string,
-    petal: Petal<CurrSeed>,
+    petal: Petal<
+      CurrSeed,
+      z.infer<Params>,
+      z.infer<Query>
+    >,
+    z?: {
+      params?: Params
+      query?: Query
+    },
   ): Branch<InitSeed, CurrSeed> {
-    return this.method("POST", path, petal)
+    return this.method("POST", path, petal, z)
   }
 
   // TODO: PUT, DELETE methods (ALL?)
-  private method(
+  private method<Params, Query>(
     method: Method,
     path: string,
-    petal: Petal<CurrSeed>,
+    petal: Petal<CurrSeed, Params, Query>,
+    z?: {
+      params?: Params
+      query?: Query
+    },
   ): Branch<InitSeed, CurrSeed> {
-    const handler = { petal, mutation: this.mutation }
+    const handler = { petal, mutation: this.mutation, z }
 
     const parts = path.split("/").filter(Boolean)
     let node = this.handlers
@@ -143,6 +188,8 @@ export class Branch<InitSeed, CurrSeed> {
     if (!node.handler) {
       node.handler = {}
     }
+
+    // @ts-ignore
     node.handler[method] = handler
 
     return new Branch<InitSeed, CurrSeed>(
