@@ -1,4 +1,4 @@
-import type { z, ZodObject, ZodRawShape } from "zod"
+import type { z, ZodObject, ZodRawShape, ZodTypeAny } from "zod"
 /**
  * Contains functions/classes related to working with routers.
  *
@@ -46,12 +46,14 @@ export type Petal<
   Query = {
     [x: string]: any
   },
+  Body = any,
 > = (
-  { req, seed, params }: {
+  { req, seed, params, query, json }: {
     req: Request
     seed: CurrSeed
     params: Params
     query: Query
+    json: Body
   },
 ) => Promise<Response> | Response
 
@@ -64,6 +66,7 @@ export type Handler<InitSeed, CurrSeed> = {
   z?: {
     params?: ZodObject<ZodRawShape>
     query?: ZodObject<ZodRawShape>
+    body?: ZodTypeAny
   }
 }
 
@@ -129,16 +132,19 @@ export class Branch<InitSeed, CurrSeed> {
   public get<
     Params extends ZodObject<ZodRawShape>,
     Query extends ZodObject<ZodRawShape>,
+    Body extends ZodTypeAny,
   >(
     path: string,
     petal: Petal<
       CurrSeed,
       z.infer<Params>,
-      z.infer<Query>
+      z.infer<Query>,
+      z.infer<Body>
     >,
     z?: {
       params?: Params
       query?: Query
+      body?: Body
     },
   ): Branch<InitSeed, CurrSeed> {
     return this.method("GET", path, petal, z)
@@ -147,29 +153,33 @@ export class Branch<InitSeed, CurrSeed> {
   public post<
     Params extends ZodObject<ZodRawShape>,
     Query extends ZodObject<ZodRawShape>,
+    Body extends ZodTypeAny,
   >(
     path: string,
     petal: Petal<
       CurrSeed,
       z.infer<Params>,
-      z.infer<Query>
+      z.infer<Query>,
+      z.infer<Body>
     >,
     z?: {
       params?: Params
       query?: Query
+      body?: Body
     },
   ): Branch<InitSeed, CurrSeed> {
     return this.method("POST", path, petal, z)
   }
 
   // TODO: PUT, DELETE methods (ALL?)
-  private method<Params, Query>(
+  private method<Params, Query, Body>(
     method: Method,
     path: string,
     petal: Petal<CurrSeed, Params, Query>,
     z?: {
       params?: Params
       query?: Query
+      body?: Body
     },
   ): Branch<InitSeed, CurrSeed> {
     const handler = { petal, mutation: this.mutation, z }
@@ -189,7 +199,7 @@ export class Branch<InitSeed, CurrSeed> {
       node.handler = {}
     }
 
-    // @ts-ignore
+    // @ts-ignore --
     node.handler[method] = handler
 
     return new Branch<InitSeed, CurrSeed>(
