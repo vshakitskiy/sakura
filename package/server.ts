@@ -24,6 +24,11 @@ import { Branch } from "./router.ts"
 import type { Method } from "./router.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
+import type { SafeParseReturnType as SafeParse } from "zod"
+
+type RecordRaw = {
+  [x: string]: any
+}
 
 /**
  * Creates request's inital seed.
@@ -70,27 +75,30 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
  * ```
  */
 export const bloom = <InitSeed, CurrSeed>({
-  seed,
+  seed: init,
   branch,
   port = 8000,
   unknown,
   error,
-  log,
+  logger,
+  quiet,
 }: {
   seed: GenSeed<InitSeed>
   branch: Branch<InitSeed, CurrSeed>
   port?: number
-  unknown?: (
-    req: Request,
-    seed: InitSeed,
-  ) => Promise<Response> | Response
-  error?: (error: unknown) => Promise<Response> | Response
-  log?: boolean
+  unknown?: ({ req, seed }: {
+    req: Request
+    seed: InitSeed
+  }) => Promise<Response> | Response
+  // TODO: seed in error handler
+  error?: ({ error }: { error: unknown }) => Promise<Response> | Response
+  logger?: boolean
+  quiet?: boolean
 }): Deno.HttpServer<Deno.NetAddr> => {
   return Deno.serve({
     port,
     onListen: () =>
-      console.log(
+      quiet || console.log(
         `%c🌸 Blooming on %chttp://localhost:${port}/`,
         "color: pink",
         "color: pink; font-weight: bold",
@@ -98,42 +106,85 @@ export const bloom = <InitSeed, CurrSeed>({
   }, async (req) => {
     const time = Date.now()
     const url = new URL(req.url)
+
     const resp = await (async () => {
       try {
-        const initSeed = await seed(req)
         const match = branch.match(req.method as Method, url.pathname)
+        const initSeed = await init(req)
 
         if (!match) {
-          if (unknown) return await unknown(req, initSeed)
-          else return fall(404)
+          if (unknown) return await unknown({ req, seed: initSeed })
+          else return fall(404, { message: "not found" })
+        }
+        const { handler: { mutation, petal, z } } = match
+        const seed = await mutation(initSeed)
+
+        let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
+        let query: SafeParse<RecordRaw, RecordRaw> | RecordRaw = getQuery(url)
+        let json: SafeParse<any, any> | any = await getBody(req)
+
+        if (z) {
+          if (z.params) params = z.params.safeParse(params)
+          if (z.query) query = z.query.safeParse(query)
+          if (z.body && json) json = z.body.safeParse(json)
         }
 
-        const currSeed = await match.handler.mutation(initSeed)
-        const resp = await match.handler.petal(req, currSeed)
+        const resp = await petal({
+          req,
+          seed,
+          params,
+          query,
+          json,
+        })
+
         return resp
       } catch (err: unknown) {
-        if (err instanceof SakuraError) {
-          return fall(err.status, err.body)
-        } else {
-          if (error) {
-            try {
-              return await error(err)
-            } catch (_) {
-              return fall(500)
-            }
-          } else return fall(500)
-        }
+        if (err instanceof SakuraError) return fall(err.status, err.body)
+        else if (error) {
+          try {
+            return await error({ error: err })
+          } catch (_) {
+            return fall(500, { message: "internal server error" })
+          }
+        } else return fall(500, { message: "internal server error" })
       }
     })()
-    if (log) {
-      const ms = Date.now() - time
-      console.log(
-        `%c${req.method} %c${url.pathname} %c${resp.status} ${ms}ms`,
-        "color: blue",
-        "color: #fff",
-        "color: green",
-      )
-    }
+    if (logger) defaultLogger(time, req, resp, url)
+
     return resp
   })
+}
+
+const getQuery = (url: URL) => {
+  const query: {
+    [x: string]: any
+  } = {}
+  for (const [key, val] of url.searchParams) {
+    query[key] = val
+  }
+  return query
+}
+
+const getBody = async (req: Request) => {
+  const isInvalid = !req.body ||
+    req.headers.get("Content-Length") === "0" ||
+    // TODO: 415 for non json body? handler?
+    req.headers.get("Content-Type") !== "application/json"
+  if (isInvalid) return null
+
+  try {
+    return await req.json()
+  } catch (_) {
+    return null
+  }
+}
+
+const defaultLogger = (time: number, req: Request, res: Response, url: URL) => {
+  const ms = Date.now() - time
+  console.log(
+    `%c${req.method} %c${url.pathname} %c${res.status} ${ms}ms`,
+    "color: blue",
+    "color: #fff",
+    "color: green",
+  )
 }

@@ -27,13 +27,11 @@
  * Represents Response as an Error.
  */
 export class SakuraError extends Error {
-  // deno-lint-ignore no-explicit-any
   public readonly body: any
   public readonly status: number
   public readonly headers?: HeadersInit
   constructor(
     status: number,
-    // deno-lint-ignore no-explicit-any
     json?: any,
     headers?: HeadersInit,
   ) {
@@ -63,7 +61,6 @@ export class SakuraError extends Error {
  */
 export const pluck = (
   status: number,
-  // deno-lint-ignore no-explicit-any
   json?: any,
   headers?: HeadersInit,
 ): never => {
@@ -83,7 +80,6 @@ export const pluck = (
  */
 export const fall = (
   status: number,
-  // deno-lint-ignore no-explicit-any
   json?: any,
   headers?: HeadersInit,
 ): Response => {

@@ -1,1 +1,6 @@
-GET http://localhost:4040/runtime HTTP/1.1
+POST http://localhost:8000/schema HTTP/1.1
+Content-Type: application/json
+
+{
+  "foo": 3
+}

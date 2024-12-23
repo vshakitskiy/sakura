@@ -13,10 +13,26 @@
  * ```
  */
 
-// deno-lint-ignore no-explicit-any
+import type {
+  SafeParseReturnType as SafeParse,
+  z,
+  ZodObject,
+  ZodRawShape as RawShape,
+  ZodTypeAny as ZodAny,
+} from "zod"
+
 type PartialRecord<K extends keyof any, T> = {
   [P in K]?: T
 }
+
+type ZodRecordRaw = ZodObject<RawShape>
+
+type RecordRaw = {
+  [x: string]: any
+}
+
+export type ExtractSeed<T> = T extends Branch<any, infer CurrSeed> ? CurrSeed
+  : never
 
 // TODO: ALL?
 /**
@@ -31,13 +47,23 @@ export type Mutation<From, To> = (
   seed: From,
 ) => To | Promise<To>
 
-// TODO: replace params as "request meta" object
+// TODO: change description
 /**
  * Function with the last mutation of the seed. Sends Response to the client.
  */
-export type Petal<CurrSeed> = (
-  req: Request,
-  seed: CurrSeed,
+export type Petal<
+  CurrSeed,
+  Params = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
+  Query = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
+  Body = SafeParse<any, any> | RecordRaw,
+> = (
+  { req, seed, params, query, json }: {
+    req: Request
+    seed: CurrSeed
+    params: Params
+    query: Query
+    json: Body
+  },
 ) => Promise<Response> | Response
 
 /**
@@ -46,6 +72,11 @@ export type Petal<CurrSeed> = (
 export type Handler<InitSeed, CurrSeed> = {
   petal: Petal<CurrSeed>
   mutation: Mutation<InitSeed, CurrSeed>
+  z?: {
+    params?: ZodRecordRaw
+    query?: ZodRecordRaw
+    body?: ZodAny
+  }
 }
 
 /**
@@ -56,6 +87,28 @@ export type HandlersTree<InitSeed, CurrSeed> = {
   handler?: PartialRecord<Method, Handler<InitSeed, CurrSeed>>
   param?: string
 }
+
+type BranchMethod<InitSeed, CurrSeed> = <
+  Params,
+  Query,
+  Body,
+>(
+  path: string,
+  petal: Petal<
+    CurrSeed,
+    Params extends ZodRecordRaw ? SafeParse<RecordRaw, z.infer<Params>>
+      : RecordRaw,
+    Query extends ZodRecordRaw ? SafeParse<RecordRaw, z.infer<Query>>
+      : RecordRaw,
+    Body extends ZodAny ? SafeParse<any, z.infer<Body>>
+      : any
+  >,
+  z?: {
+    params?: Params
+    query?: Query
+    body?: Body
+  },
+) => Branch<InitSeed, CurrSeed>
 
 /**
  * Creates new branch that appends to the blooming sakura later.
@@ -107,27 +160,31 @@ export class Branch<InitSeed, CurrSeed> {
 
   // TODO: implement merging branches + naming
 
-  public get(
-    path: string,
-    petal: Petal<CurrSeed>,
-  ): Branch<InitSeed, CurrSeed> {
-    return this.method("GET", path, petal)
-  }
-
-  public post(
-    path: string,
-    petal: Petal<CurrSeed>,
-  ): Branch<InitSeed, CurrSeed> {
-    return this.method("POST", path, petal)
-  }
-
   // TODO: PUT, DELETE methods (ALL?)
-  private method(
+  public get: BranchMethod<InitSeed, CurrSeed> = this.method("GET")
+  public post: BranchMethod<InitSeed, CurrSeed> = this.method("POST")
+
+  private method(method: Method): BranchMethod<InitSeed, CurrSeed> {
+    return (path, petal, z?) => this.append(method, path, petal, z)
+  }
+
+  private append<
+    Params,
+    Query,
+    Body,
+    Schemas,
+  >(
     method: Method,
     path: string,
-    petal: Petal<CurrSeed>,
+    petal: Petal<
+      CurrSeed,
+      Params,
+      Query,
+      Body
+    >,
+    z?: Schemas,
   ): Branch<InitSeed, CurrSeed> {
-    const handler = { petal, mutation: this.mutation }
+    const handler = { petal, mutation: this.mutation, z }
 
     const parts = path.split("/").filter(Boolean)
     let node = this.handlers
@@ -143,6 +200,8 @@ export class Branch<InitSeed, CurrSeed> {
     if (!node.handler) {
       node.handler = {}
     }
+
+    // @ts-ignore --
     node.handler[method] = handler
 
     return new Branch<InitSeed, CurrSeed>(
