@@ -1,4 +1,3 @@
-import type { z, ZodObject, ZodRawShape, ZodTypeAny } from "zod"
 /**
  * Contains functions/classes related to working with routers.
  *
@@ -14,8 +13,22 @@ import type { z, ZodObject, ZodRawShape, ZodTypeAny } from "zod"
  * ```
  */
 
+import type {
+  SafeParseReturnType as SafeParse,
+  z,
+  ZodObject,
+  ZodRawShape as RawShape,
+  ZodTypeAny as ZodAny,
+} from "zod"
+
 type PartialRecord<K extends keyof any, T> = {
   [P in K]?: T
+}
+
+type ZodRecordRaw = ZodObject<RawShape>
+
+type RecordRaw = {
+  [x: string]: any
 }
 
 export type ExtractSeed<T> = T extends Branch<any, infer CurrSeed> ? CurrSeed
@@ -40,13 +53,9 @@ export type Mutation<From, To> = (
  */
 export type Petal<
   CurrSeed,
-  Params = {
-    [x: string]: any
-  },
-  Query = {
-    [x: string]: any
-  },
-  Body = any,
+  Params = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
+  Query = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
+  Body = SafeParse<any, any> | RecordRaw,
 > = (
   { req, seed, params, query, json }: {
     req: Request
@@ -64,9 +73,9 @@ export type Handler<InitSeed, CurrSeed> = {
   petal: Petal<CurrSeed>
   mutation: Mutation<InitSeed, CurrSeed>
   z?: {
-    params?: ZodObject<ZodRawShape>
-    query?: ZodObject<ZodRawShape>
-    body?: ZodTypeAny
+    params?: ZodRecordRaw
+    query?: ZodRecordRaw
+    body?: ZodAny
   }
 }
 
@@ -78,6 +87,28 @@ export type HandlersTree<InitSeed, CurrSeed> = {
   handler?: PartialRecord<Method, Handler<InitSeed, CurrSeed>>
   param?: string
 }
+
+type BranchMethod<InitSeed, CurrSeed> = <
+  Params,
+  Query,
+  Body,
+>(
+  path: string,
+  petal: Petal<
+    CurrSeed,
+    Params extends ZodRecordRaw ? SafeParse<RecordRaw, z.infer<Params>>
+      : RecordRaw,
+    Query extends ZodRecordRaw ? SafeParse<RecordRaw, z.infer<Query>>
+      : RecordRaw,
+    Body extends ZodAny ? SafeParse<any, z.infer<Body>>
+      : any
+  >,
+  z?: {
+    params?: Params
+    query?: Query
+    body?: Body
+  },
+) => Branch<InitSeed, CurrSeed>
 
 /**
  * Creates new branch that appends to the blooming sakura later.
@@ -129,58 +160,29 @@ export class Branch<InitSeed, CurrSeed> {
 
   // TODO: implement merging branches + naming
 
-  public get<
-    Params extends ZodObject<ZodRawShape>,
-    Query extends ZodObject<ZodRawShape>,
-    Body extends ZodTypeAny,
-  >(
-    path: string,
-    petal: Petal<
-      CurrSeed,
-      z.infer<Params>,
-      z.infer<Query>,
-      z.infer<Body>
-    >,
-    z?: {
-      params?: Params
-      query?: Query
-      body?: Body
-    },
-  ): Branch<InitSeed, CurrSeed> {
-    return this.method("GET", path, petal, z)
-  }
-
-  public post<
-    Params extends ZodObject<ZodRawShape>,
-    Query extends ZodObject<ZodRawShape>,
-    Body extends ZodTypeAny,
-  >(
-    path: string,
-    petal: Petal<
-      CurrSeed,
-      z.infer<Params>,
-      z.infer<Query>,
-      z.infer<Body>
-    >,
-    z?: {
-      params?: Params
-      query?: Query
-      body?: Body
-    },
-  ): Branch<InitSeed, CurrSeed> {
-    return this.method("POST", path, petal, z)
-  }
-
   // TODO: PUT, DELETE methods (ALL?)
-  private method<Params, Query, Body>(
+  public get: BranchMethod<InitSeed, CurrSeed> = this.method("GET")
+  public post: BranchMethod<InitSeed, CurrSeed> = this.method("POST")
+
+  private method(method: Method): BranchMethod<InitSeed, CurrSeed> {
+    return (path, petal, z?) => this.append(method, path, petal, z)
+  }
+
+  private append<
+    Params,
+    Query,
+    Body,
+    Schemas,
+  >(
     method: Method,
     path: string,
-    petal: Petal<CurrSeed, Params, Query>,
-    z?: {
-      params?: Params
-      query?: Query
-      body?: Body
-    },
+    petal: Petal<
+      CurrSeed,
+      Params,
+      Query,
+      Body
+    >,
+    z?: Schemas,
   ): Branch<InitSeed, CurrSeed> {
     const handler = { petal, mutation: this.mutation, z }
 

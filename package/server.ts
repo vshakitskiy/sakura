@@ -24,6 +24,11 @@ import { Branch } from "./router.ts"
 import type { Method } from "./router.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
+import type { SafeParseReturnType as SafeParse } from "zod"
+
+type RecordRaw = {
+  [x: string]: any
+}
 
 /**
  * Creates request's inital seed.
@@ -114,15 +119,14 @@ export const bloom = <InitSeed, CurrSeed>({
         const { handler: { mutation, petal, z } } = match
         const seed = await mutation(initSeed)
 
-        let params = match.params
-        let query = getQuery(url)
-        let json = await getBody(req)
+        let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
+        let query: SafeParse<RecordRaw, RecordRaw> | RecordRaw = getQuery(url)
+        let json: SafeParse<any, any> | any = await getBody(req)
 
         if (z) {
-          // TODO: safeParse
-          if (z.params) params = z.params.parse(params)
-          if (z.query) query = z.query.parse(query)
-          if (z.body && json) json = z.body.parse(json)
+          if (z.params) params = z.params.safeParse(params)
+          if (z.query) query = z.query.safeParse(query)
+          if (z.body && json) json = z.body.safeParse(json)
         }
 
         const resp = await petal({
