@@ -80,6 +80,7 @@ export const bloom = <InitSeed, CurrSeed>({
   port = 8000,
   unknown,
   error,
+  unsupported,
   logger,
   quiet,
 }: {
@@ -90,9 +91,19 @@ export const bloom = <InitSeed, CurrSeed>({
     req: Request
     seed: InitSeed
   }) => Promise<Response> | Response
-  // TODO: seed in error handler
-  error?: ({ error }: { error: unknown }) => Promise<Response> | Response
-  logger?: boolean
+  error?: (
+    { error, seed }: { error: unknown; seed: InitSeed },
+  ) => Promise<Response> | Response
+  unsupported?: (
+    { req, seed }: { req: Request; seed: InitSeed },
+  ) => Promise<Response> | Response
+  logger?:
+    | (({ req, res, st }: {
+      req: Request
+      res: Response
+      st: number
+    }) => void)
+    | boolean
   quiet?: boolean
 }): Deno.HttpServer<Deno.NetAddr> => {
   return Deno.serve({
@@ -108,9 +119,22 @@ export const bloom = <InitSeed, CurrSeed>({
     const url = new URL(req.url)
 
     const resp = await (async () => {
+      const initSeed = await init(req)
+
       try {
+        if (
+          req.headers.get("Content-Type") &&
+          req.headers.get("Content-Type") !== "application/json"
+        ) {
+          if (unsupported) return unsupported({ req, seed: initSeed })
+
+          console.log(
+            `%cWarning: unsupported Content-Type header`,
+            "color: yellow",
+          )
+        }
+
         const match = branch.match(req.method as Method, url.pathname)
-        const initSeed = await init(req)
 
         if (!match) {
           if (unknown) return await unknown({ req, seed: initSeed })
@@ -126,7 +150,7 @@ export const bloom = <InitSeed, CurrSeed>({
         if (z) {
           if (z.params) params = z.params.safeParse(params)
           if (z.query) query = z.query.safeParse(query)
-          if (z.body && json) json = z.body.safeParse(json)
+          if (z.body) json = z.body.safeParse(json)
         }
 
         const resp = await petal({
@@ -134,7 +158,7 @@ export const bloom = <InitSeed, CurrSeed>({
           seed,
           params,
           query,
-          json,
+          json: req.method === "GET" ? undefined : json,
         })
 
         return resp
@@ -142,14 +166,17 @@ export const bloom = <InitSeed, CurrSeed>({
         if (err instanceof SakuraError) return fall(err.status, err.body)
         else if (error) {
           try {
-            return await error({ error: err })
+            return await error({ error: err, seed: initSeed })
           } catch (_) {
             return fall(500, { message: "internal server error" })
           }
         } else return fall(500, { message: "internal server error" })
       }
     })()
-    if (logger) defaultLogger(time, req, resp, url)
+    if (logger) {
+      if (typeof logger === "boolean") defaultLogger(time, req, resp, url)
+      else logger({ req, res: resp, st: time })
+    }
 
     return resp
   })
@@ -168,8 +195,8 @@ const getQuery = (url: URL) => {
 const getBody = async (req: Request) => {
   const isInvalid = !req.body ||
     req.headers.get("Content-Length") === "0" ||
-    // TODO: 415 for non json body? handler?
-    req.headers.get("Content-Type") !== "application/json"
+    !req.headers.get("Content-Type")
+
   if (isInvalid) return null
 
   try {

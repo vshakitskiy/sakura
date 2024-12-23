@@ -20,16 +20,9 @@ import type {
   ZodRawShape as RawShape,
   ZodTypeAny as ZodAny,
 } from "zod"
-
-type PartialRecord<K extends keyof any, T> = {
-  [P in K]?: T
-}
+import type { OnSchema, PartialRecord, RecordRaw } from "./utils.ts"
 
 type ZodRecordRaw = ZodObject<RawShape>
-
-type RecordRaw = {
-  [x: string]: any
-}
 
 export type ExtractSeed<T> = T extends Branch<any, infer CurrSeed> ? CurrSeed
   : never
@@ -38,7 +31,7 @@ export type ExtractSeed<T> = T extends Branch<any, infer CurrSeed> ? CurrSeed
 /**
  * Request's method.
  */
-export type Method = "GET" | "POST" | "DELETE" | "PUT"
+export type Method = "GET" | "POST" | "DELETE" | "PUT" | "PATCH"
 
 /**
  * Mutates seed and returns it.
@@ -47,23 +40,32 @@ export type Mutation<From, To> = (
   seed: From,
 ) => To | Promise<To>
 
+type PetalMeta<
+  CurrSeed,
+  Params,
+  Query,
+  Body,
+> = {
+  req: Request
+  seed: CurrSeed
+  params: Params
+  query: Query
+  json: Body
+}
+
 // TODO: change description
 /**
- * Function with the last mutation of the seed. Sends Response to the client.
+ * Function with the metadata of the request: params, query, body json and last mutated seed.
+ * If Zod schemas provided, metadata contains result of metadata's parsing.
  */
 export type Petal<
   CurrSeed,
   Params = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
   Query = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
   Body = SafeParse<any, any> | RecordRaw,
+  Meta = PetalMeta<CurrSeed, Params, Query, Body>,
 > = (
-  { req, seed, params, query, json }: {
-    req: Request
-    seed: CurrSeed
-    params: Params
-    query: Query
-    json: Body
-  },
+  meta: Meta,
 ) => Promise<Response> | Response
 
 /**
@@ -88,20 +90,23 @@ export type HandlersTree<InitSeed, CurrSeed> = {
   param?: string
 }
 
-type BranchMethod<InitSeed, CurrSeed> = <
-  Params,
-  Query,
-  Body,
+type BranchMethod<InitSeed, CurrSeed, Method> = <
+  Params extends ZodRecordRaw,
+  Query extends ZodRecordRaw,
+  Body extends ZodAny,
+  ParamsParse = OnSchema<Params, ZodRecordRaw, RecordRaw, z.infer<Params>>,
+  QueryParse = OnSchema<Query, ZodRecordRaw, RecordRaw, z.infer<Query>>,
+  BodyParse = OnSchema<Body, ZodAny, any, z.infer<Body>>,
 >(
   path: string,
   petal: Petal<
     CurrSeed,
-    Params extends ZodRecordRaw ? SafeParse<RecordRaw, z.infer<Params>>
-      : RecordRaw,
-    Query extends ZodRecordRaw ? SafeParse<RecordRaw, z.infer<Query>>
-      : RecordRaw,
-    Body extends ZodAny ? SafeParse<any, z.infer<Body>>
-      : any
+    ParamsParse,
+    QueryParse,
+    BodyParse,
+    Method extends "GET"
+      ? Omit<PetalMeta<CurrSeed, ParamsParse, QueryParse, BodyParse>, "json">
+      : PetalMeta<CurrSeed, ParamsParse, QueryParse, BodyParse>
   >,
   z?: {
     params?: Params
@@ -160,11 +165,15 @@ export class Branch<InitSeed, CurrSeed> {
 
   // TODO: implement merging branches + naming
 
-  // TODO: PUT, DELETE methods (ALL?)
-  public get: BranchMethod<InitSeed, CurrSeed> = this.method("GET")
-  public post: BranchMethod<InitSeed, CurrSeed> = this.method("POST")
+  public get: BranchMethod<InitSeed, CurrSeed, "GET"> = this.method("GET")
+  public post: BranchMethod<InitSeed, CurrSeed, "POST"> = this.method("POST")
+  public put: BranchMethod<InitSeed, CurrSeed, "PUT"> = this.method("PUT")
+  public delete: BranchMethod<InitSeed, CurrSeed, "DELETE"> = this.method(
+    "DELETE",
+  )
+  public patch: BranchMethod<InitSeed, CurrSeed, "PATCH"> = this.method("PATCH")
 
-  private method(method: Method): BranchMethod<InitSeed, CurrSeed> {
+  private method(method: Method): BranchMethod<InitSeed, CurrSeed, Method> {
     return (path, petal, z?) => this.append(method, path, petal, z)
   }
 
