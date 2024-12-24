@@ -98,10 +98,10 @@ export const bloom = <InitSeed, CurrSeed>({
     { req, seed }: { req: Request; seed: InitSeed },
   ) => Promise<Response> | Response
   logger?:
-    | (({ req, res, st }: {
+    | (({ req, res, now }: {
       req: Request
       res: Response
-      st: number
+      now: number
     }) => void)
     | boolean
   quiet?: boolean
@@ -115,7 +115,7 @@ export const bloom = <InitSeed, CurrSeed>({
         "color: pink; font-weight: bold",
       ),
   }, async (req) => {
-    const time = Date.now()
+    const now = Date.now()
     const url = new URL(req.url)
 
     const resp = await (async () => {
@@ -174,8 +174,8 @@ export const bloom = <InitSeed, CurrSeed>({
       }
     })()
     if (logger) {
-      if (typeof logger === "boolean") defaultLogger(time, req, resp, url)
-      else logger({ req, res: resp, st: time })
+      if (typeof logger === "boolean") defaultLogger(now, req, resp, url)
+      else logger({ req, res: resp, now })
     }
 
     return resp
@@ -206,8 +206,8 @@ const getBody = async (req: Request) => {
   }
 }
 
-const defaultLogger = (time: number, req: Request, res: Response, url: URL) => {
-  const ms = Date.now() - time
+const defaultLogger = (now: number, req: Request, res: Response, url: URL) => {
+  const ms = Date.now() - now
   console.log(
     `%c${req.method} %c${url.pathname} %c${res.status} ${ms}ms`,
     "color: blue",

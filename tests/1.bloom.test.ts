@@ -14,8 +14,8 @@ Deno.test("Catch unknown endpoint", async () => {
   const server = bloom({
     seed,
     branch,
-    port,
     quiet: true,
+    port,
   })
 
   const unknown = await get<Msg>(port, "/abc")
@@ -30,8 +30,8 @@ Deno.test("Catch unexpected error", async () => {
   const server = bloom({
     seed,
     branch,
-    port,
     quiet: true,
+    port,
   })
 
   const error = await get<Msg>(port, "/unexpected")
@@ -46,10 +46,10 @@ Deno.test("Handle custom petals", async () => {
   const server = bloom({
     seed,
     branch,
+    quiet: true,
     port,
     unknown: () => fall(405, "foo"),
     error: () => fall(501, "bar"),
-    quiet: true,
   })
 
   const unknown = await get<string>(port, "/abc")
@@ -59,6 +59,25 @@ Deno.test("Handle custom petals", async () => {
   const error = await get<string>(port, "/unexpected")
   is(error.status, 501)
   is(error.json!, "bar")
+
+  server.shutdown()
+})
+
+Deno.test("Unsupported Content-Type", async () => {
+  const port = 3003
+  const server = bloom({
+    seed,
+    branch,
+    quiet: true,
+    port,
+    unsupported: () => fall(415),
+  })
+
+  const unsupported = await get<string>(port, "/unexpected", {
+    "Content-Type": "text/plain",
+  })
+  is(unsupported.status, 415)
+  is(unsupported.json!, null)
 
   server.shutdown()
 })

@@ -27,7 +27,6 @@ type ZodRecordRaw = ZodObject<RawShape>
 export type ExtractSeed<T> = T extends Branch<any, infer CurrSeed> ? CurrSeed
   : never
 
-// TODO: ALL?
 /**
  * Request's method.
  */
@@ -53,7 +52,6 @@ type PetalMeta<
   json: Body
 }
 
-// TODO: change description
 /**
  * Function with the metadata of the request: params, query, body json and last mutated seed.
  * If Zod schemas provided, metadata contains result of metadata's parsing.

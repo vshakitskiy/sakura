@@ -8,8 +8,14 @@ export const baseSeed = () => sakura((req) => ({ req }))
 export const ok = () => fall(200, { message: "ok" })
 export const empty = () => fall(204)
 
-export const get = async <T>(port: number, path: string) => {
-  const req = await fetch(`http://localhost:${port}${path}`)
+export const get = async <T>(
+  port: number,
+  path: string,
+  headers?: HeadersInit,
+) => {
+  const req = await fetch(`http://localhost:${port}${path}`, {
+    headers,
+  })
   const isEmpty = !req.body || req.headers.get("Content-Length") === "0"
 
   if (isEmpty) {
