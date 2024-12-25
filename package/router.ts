@@ -60,7 +60,7 @@ export type Petal<
   CurrSeed,
   Params = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
   Query = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
-  Body = SafeParse<any, any> | RecordRaw,
+  Body = SafeParse<any, any> | any,
   Meta = PetalMeta<CurrSeed, Params, Query, Body>,
 > = (
   meta: Meta,
@@ -85,7 +85,7 @@ export type Handler<InitSeed, CurrSeed> = {
 export type HandlersTree<InitSeed, CurrSeed> = {
   next: Record<string, HandlersTree<InitSeed, CurrSeed>>
   handler?: PartialRecord<Method, Handler<InitSeed, CurrSeed>>
-  param?: string
+  param?: PartialRecord<Method, string>
 }
 
 type BranchMethod<InitSeed, CurrSeed, Method> = <
@@ -199,9 +199,12 @@ export class Branch<InitSeed, CurrSeed> {
       const isParam = part.startsWith(":")
       const key = isParam ? ":" : part
       if (!node.next[key]) node.next[key] = { next: {} }
-
       node = node.next[key]
-      if (isParam) node.param = part.slice(1)
+
+      if (isParam) {
+        if (!node.param) node.param = {}
+        node.param[method] = part.slice(1)
+      }
     }
 
     if (!node.handler) {
@@ -229,7 +232,7 @@ export class Branch<InitSeed, CurrSeed> {
       if (node.next[part]) node = node.next[part]
       else if (node.next[":"]) {
         node = node.next[":"]
-        params[node.param!] = part
+        params[node.param![method]!] = part
       } else return null
     }
 

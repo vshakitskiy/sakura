@@ -1,5 +1,5 @@
 import { bloom, fall } from "@vsh/sakura"
-import { baseSeed, get, is, type Msg } from "./utils.ts"
+import { baseSeed, empty, get, is, type Msg } from "./utils.ts"
 
 const { branch: b, seed } = baseSeed()
 const branch = b()
@@ -77,7 +77,7 @@ Deno.test("Unsupported Content-Type", async () => {
     "Content-Type": "text/plain",
   })
   is(unsupported.status, 415)
-  is(unsupported.json!, null)
+  empty(unsupported.json!)
 
   server.shutdown()
 })

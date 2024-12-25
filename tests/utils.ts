@@ -1,12 +1,27 @@
 import { fall, sakura } from "@vsh/sakura"
-import { assertEquals } from "@std/assert"
+import type { GenSeed, Petal } from "@vsh/sakura"
+import { assertEquals, assertExists, AssertionError } from "@std/assert"
 
 export type Msg = { message: string }
 
 export const baseSeed = () => sakura((req) => ({ req }))
 
+export const run = async (
+  petal: Petal<any>,
+  seed: GenSeed<any>,
+  req: Request = new Request(""),
+) => {
+  return await petal({
+    params: {},
+    query: {},
+    json: null,
+    req,
+    seed: await seed(req),
+  })
+}
+
 export const ok = () => fall(200, { message: "ok" })
-export const empty = () => fall(204)
+export const plug = () => fall(204)
 
 export const get = async <T>(
   port: number,
@@ -26,5 +41,15 @@ export const get = async <T>(
 }
 
 export const is = <T>(f: T, s: T, m?: string) => assertEquals(f, s, m)
+
+export const exists = <T>(f: T, m?: string) => assertExists(f, m)
+
+export const empty = <T>(f: T, m?: string) => {
+  if (f !== undefined && f !== null) {
+    const msgSuffix = m ? `: ${m}` : "."
+    m = `Expected actual: "${f}" to not be null or undefined${msgSuffix}`
+    throw new AssertionError(m)
+  }
+}
 
 export const isN = <T>(f: T, m?: string) => assertEquals(f, null, m)
