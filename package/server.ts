@@ -57,7 +57,7 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
   branch: () => Branch.create<Seed>(),
 })
 
-// TODO: fall(req, res, seed | meta + res) method (After request handler)
+// @TODO: fall(req, res, seed | meta + res) method (After request handler)
 /**
  * Starts server with the options provided.
  *
@@ -137,36 +137,34 @@ export const bloom = <InitSeed, CurrSeed>({
         const match = branch.match(req.method as Method, url.pathname)
 
         if (!match) {
-          if (unknown) return await unknown({ req, seed: initSeed })
+          if (unknown) return unknown({ req, seed: initSeed })
           else return fall(404, { message: "not found" })
         }
-        const { handler: { mutation, petal, z } } = match
+        const { handler: { mutation, petal, schemas } } = match
         const seed = await mutation(initSeed)
 
         let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
         let query: SafeParse<RecordRaw, RecordRaw> | RecordRaw = getQuery(url)
         let json: SafeParse<any, any> | any = await getBody(req)
 
-        if (z) {
-          if (z.params) params = z.params.safeParse(params)
-          if (z.query) query = z.query.safeParse(query)
-          if (z.body) json = z.body.safeParse(json)
+        if (schemas) {
+          if (schemas.params) params = schemas.params.safeParse(params)
+          if (schemas.query) query = schemas.query.safeParse(query)
+          if (schemas.body) json = schemas.body.safeParse(json)
         }
 
-        const resp = await petal({
+        return petal({
           req,
           seed,
           params,
           query,
           json: req.method === "GET" ? undefined : json,
         })
-
-        return resp
       } catch (err: unknown) {
         if (err instanceof SakuraError) return fall(err.status, err.body)
         else if (error) {
           try {
-            return await error({ error: err, seed: initSeed })
+            return error({ error: err, seed: initSeed })
           } catch (_) {
             return fall(500, { message: "internal server error" })
           }

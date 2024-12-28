@@ -15,7 +15,6 @@
 
 import type {
   SafeParseReturnType as SafeParse,
-  z,
   ZodObject,
   ZodRawShape as RawShape,
   ZodTypeAny as ZodAny,
@@ -57,60 +56,69 @@ type PetalMeta<
  * If Zod schemas provided, metadata contains result of metadata's parsing.
  */
 export type Petal<
-  CurrSeed,
-  Params = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
-  Query = SafeParse<RecordRaw, RecordRaw> | RecordRaw,
-  Body = SafeParse<any, any> | any,
-  Meta = PetalMeta<CurrSeed, Params, Query, Body>,
+  Meta = PetalMeta<
+    any,
+    SafeParse<RecordRaw, RecordRaw> | RecordRaw,
+    SafeParse<RecordRaw, RecordRaw> | RecordRaw,
+    SafeParse<any, any> | any
+  >,
+  Method = string,
 > = (
-  meta: Meta,
+  meta: Method extends "GET" ? Omit<Meta, "json"> : Meta,
 ) => Promise<Response> | Response
+
+type Schemas = {
+  params: ZodRecordRaw
+  query: ZodRecordRaw
+  body: ZodAny
+}
+
+type DefaultSchema = {
+  params: undefined
+  query: undefined
+  body: undefined
+}
 
 /**
  * Contains the last mutation and response function
  */
 export type Handler<InitSeed, CurrSeed> = {
-  petal: Petal<CurrSeed>
+  petal: Petal<
+    PetalMeta<
+      any,
+      SafeParse<RecordRaw, RecordRaw> | RecordRaw,
+      SafeParse<RecordRaw, RecordRaw> | RecordRaw,
+      SafeParse<any, any> | any
+    >
+  >
   mutation: Mutation<InitSeed, CurrSeed>
-  z?: {
-    params?: ZodRecordRaw
-    query?: ZodRecordRaw
-    body?: ZodAny
-  }
+  schemas?: Schemas
 }
 
 /**
  * Represents handlers as a tree.
  */
 export type HandlersTree<InitSeed, CurrSeed> = {
-  next: Record<string, HandlersTree<InitSeed, CurrSeed>>
+  next: Record<string, HandlersTree<InitSeed, CurrSeed>> | null
   handler?: PartialRecord<Method, Handler<InitSeed, CurrSeed>>
   param?: PartialRecord<Method, string>
 }
 
+// @TODO: incorrect 'schemas' arg type
 type BranchMethod<InitSeed, CurrSeed, Method> = <
-  Params extends ZodRecordRaw,
-  Query extends ZodRecordRaw,
-  Body extends ZodAny,
-  ParamsParse = OnSchema<Params, ZodRecordRaw, RecordRaw, z.infer<Params>>,
-  QueryParse = OnSchema<Query, ZodRecordRaw, RecordRaw, z.infer<Query>>,
-  BodyParse = OnSchema<Body, ZodAny, any, z.infer<Body>>,
+  Z extends Partial<Schemas> = Partial<DefaultSchema>,
 >(
   path: string,
   petal: Petal<
-    CurrSeed,
-    ParamsParse,
-    QueryParse,
-    BodyParse,
-    Method extends "GET"
-      ? Omit<PetalMeta<CurrSeed, ParamsParse, QueryParse, BodyParse>, "json">
-      : PetalMeta<CurrSeed, ParamsParse, QueryParse, BodyParse>
+    PetalMeta<
+      CurrSeed,
+      OnSchema<Z["params"], ZodRecordRaw, RecordRaw>,
+      OnSchema<Z["query"], ZodRecordRaw, RecordRaw>,
+      OnSchema<Z["body"], ZodAny, any>
+    >,
+    Method
   >,
-  z?: {
-    params?: Params
-    query?: Query
-    body?: Body
-  },
+  schemas?: Z & Method extends "GET" ? Omit<Z, "body"> : Z,
 ) => Branch<InitSeed, CurrSeed>
 
 /**
@@ -132,8 +140,8 @@ type BranchMethod<InitSeed, CurrSeed, Method> = <
  * ```
  */
 export class Branch<InitSeed, CurrSeed> {
-  handlers: HandlersTree<InitSeed, CurrSeed>
-  mutation: Mutation<InitSeed, CurrSeed>
+  private handlers: HandlersTree<InitSeed, CurrSeed>
+  private mutation: Mutation<InitSeed, CurrSeed>
 
   constructor(
     handlers: HandlersTree<InitSeed, CurrSeed>,
@@ -149,6 +157,10 @@ export class Branch<InitSeed, CurrSeed> {
     }, (seed) => seed)
   }
 
+  public get raw() {
+    return this.handlers
+  }
+
   public with<MutatedSeed>(
     mutation: Mutation<CurrSeed, MutatedSeed>,
   ): Branch<InitSeed, MutatedSeed> {
@@ -161,7 +173,74 @@ export class Branch<InitSeed, CurrSeed> {
     )
   }
 
-  // TODO: implement merging branches + naming
+  public merge<CurrAnySeed>(
+    path: string,
+    branch: Branch<InitSeed, CurrAnySeed>,
+  ) {
+    let currNode = this.handlers
+    const node = branch.raw
+
+    const parts = path.split("/").filter(Boolean)
+    for (const part of parts) {
+      const isParam = part.startsWith(":")
+      const key = isParam ? ":" : part
+      if (!currNode.next) currNode.next = {}
+      if (!currNode.next[key]) currNode.next[key] = { next: null }
+      currNode = currNode.next[key]
+    }
+
+    // console.log("%c\nCURRENT HANDLER:\n", "color: orange")
+    // console.dir(this.handlers, {
+    //   depth: null,
+    // })
+    // console.log(`%c\nCONNECT AT PATH ${path}:\n`, "color: orange")
+    // console.dir(node, {
+    //   depth: null,
+    // })
+
+    copyNode(
+      node as unknown as HandlersTree<InitSeed, CurrSeed>,
+      currNode,
+    )
+
+    if (!currNode.next) currNode.next = {}
+    this._merge(
+      node.next as Record<string, HandlersTree<InitSeed, CurrSeed>> | null,
+      currNode.next,
+    )
+
+    // console.log("%c\nRESULT:\n", "color: orange")
+    // console.dir(this.handlers, {
+    //   depth: null,
+    // })
+
+    return new Branch<InitSeed, CurrSeed>(
+      this.handlers,
+      this.mutation,
+    )
+  }
+
+  private _merge(
+    from: Record<string, HandlersTree<InitSeed, CurrSeed>> | null,
+    to: Record<string, HandlersTree<InitSeed, CurrSeed>> | null,
+  ) {
+    if (!from || !to) return
+
+    for (const [path, node] of Object.entries(from)) {
+      if (!to[path]) to[path] = { next: null }
+      const next = to[path]
+
+      copyNode(node, next)
+
+      if (node.next) {
+        next.next = {}
+        this._merge(
+          node.next,
+          next.next,
+        )
+      }
+    }
+  }
 
   public get: BranchMethod<InitSeed, CurrSeed, "GET"> = this.method("GET")
   public post: BranchMethod<InitSeed, CurrSeed, "POST"> = this.method("POST")
@@ -172,33 +251,32 @@ export class Branch<InitSeed, CurrSeed> {
   public patch: BranchMethod<InitSeed, CurrSeed, "PATCH"> = this.method("PATCH")
 
   private method(method: Method): BranchMethod<InitSeed, CurrSeed, Method> {
-    return (path, petal, z?) => this.append(method, path, petal, z)
+    return (path, petal, schemas?) => this.append(method, path, petal, schemas)
   }
 
-  private append<
-    Params,
-    Query,
-    Body,
-    Schemas,
-  >(
+  private append<Z extends Partial<Schemas>>(
     method: Method,
     path: string,
     petal: Petal<
-      CurrSeed,
-      Params,
-      Query,
-      Body
+      PetalMeta<
+        CurrSeed,
+        OnSchema<Z["params"], ZodRecordRaw, RecordRaw>,
+        OnSchema<Z["query"], ZodRecordRaw, RecordRaw>,
+        OnSchema<Z["body"], ZodAny, any>
+      >,
+      Method
     >,
-    z?: Schemas,
+    schemas?: Z & Method extends "GET" ? Omit<Z, "body"> : Z,
   ): Branch<InitSeed, CurrSeed> {
-    const handler = { petal, mutation: this.mutation, z }
+    const handler = { petal, mutation: this.mutation, schemas }
 
     const parts = path.split("/").filter(Boolean)
     let node = this.handlers
     for (const part of parts) {
       const isParam = part.startsWith(":")
       const key = isParam ? ":" : part
-      if (!node.next[key]) node.next[key] = { next: {} }
+      if (!node.next) node.next = {}
+      if (!node.next[key]) node.next[key] = { next: null }
       node = node.next[key]
 
       if (isParam) {
@@ -211,7 +289,7 @@ export class Branch<InitSeed, CurrSeed> {
       node.handler = {}
     }
 
-    // @ts-ignore --
+    // @ts-ignore joining custom types with default types
     node.handler[method] = handler
 
     return new Branch<InitSeed, CurrSeed>(
@@ -229,7 +307,8 @@ export class Branch<InitSeed, CurrSeed> {
     const params: Record<string, string> = {}
 
     for (const part of parts) {
-      if (node.next[part]) node = node.next[part]
+      if (!node.next) return null
+      else if (node.next[part]) node = node.next[part]
       else if (node.next[":"]) {
         node = node.next[":"]
         params[node.param![method]!] = part
@@ -242,5 +321,26 @@ export class Branch<InitSeed, CurrSeed> {
         params,
       }
       : null
+  }
+}
+
+const copyNode = <InitSeed, CurrSeed>(
+  from: HandlersTree<InitSeed, CurrSeed>,
+  to: HandlersTree<InitSeed, CurrSeed>,
+) => {
+  if (from.handler) {
+    if (!to.handler) to.handler = {}
+
+    for (const [method, handler] of Object.entries(from.handler)) {
+      to.handler[method as Method] = handler
+    }
+  }
+
+  if (from.param) {
+    if (!to.param) to.param = {}
+
+    for (const [method, param] of Object.entries(from.param)) {
+      to.param[method as Method] = param
+    }
   }
 }
