@@ -173,6 +173,7 @@ export class Branch<InitSeed, CurrSeed> {
     )
   }
 
+  // @TODO: merge with dynamic path
   public merge<CurrAnySeed>(
     path: string,
     branch: Branch<InitSeed, CurrAnySeed>,
@@ -187,6 +188,11 @@ export class Branch<InitSeed, CurrSeed> {
       if (!currNode.next) currNode.next = {}
       if (!currNode.next[key]) currNode.next[key] = { next: null }
       currNode = currNode.next[key]
+
+      // if (isParam) {
+      //   if (!currNode.param) currNode.param = {}
+      //   currNode.param[method] = part.slice(1)
+      // }
     }
 
     // console.log("%c\nCURRENT HANDLER:\n", "color: orange")

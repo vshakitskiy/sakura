@@ -57,7 +57,6 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
   branch: () => Branch.create<Seed>(),
 })
 
-// @TODO: fall(req, res, seed | meta + res) method (After request handler)
 /**
  * Starts server with the options provided.
  *
