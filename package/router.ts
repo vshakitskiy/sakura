@@ -178,7 +178,8 @@ export class Branch<InitSeed, CurrSeed> {
     path: string,
     branch: Branch<InitSeed, CurrAnySeed>,
   ) {
-    let currNode = this.handlers
+    const copy = Object.assign({}, this.handlers)
+    let currNode = copy
     const node = branch.raw
 
     const parts = path.split("/").filter(Boolean)
@@ -196,7 +197,7 @@ export class Branch<InitSeed, CurrSeed> {
     }
 
     // console.log("%c\nCURRENT HANDLER:\n", "color: orange")
-    // console.dir(this.handlers, {
+    // console.dir(copy, {
     //   depth: null,
     // })
     // console.log(`%c\nCONNECT AT PATH ${path}:\n`, "color: orange")
@@ -215,13 +216,16 @@ export class Branch<InitSeed, CurrSeed> {
       currNode.next,
     )
 
-    // console.log("%c\nRESULT:\n", "color: orange")
-    // console.dir(this.handlers, {
-    //   depth: null,
-    // })
+    console.dir(copy, {
+      depth: null,
+    })
+    console.log("%c\nRESULT:\n", "color: orange")
+    console.dir(this.handlers, {
+      depth: null,
+    })
 
     return new Branch<InitSeed, CurrSeed>(
-      this.handlers,
+      copy,
       this.mutation,
     )
   }
@@ -236,10 +240,12 @@ export class Branch<InitSeed, CurrSeed> {
       if (!to[path]) to[path] = { next: null }
       const next = to[path]
 
+      // console.log("%cBefore:", "color: orange", path, next)
       copyNode(node, next)
+      // console.log("%cAfter:", "color: orange", path, next)
 
       if (node.next) {
-        next.next = {}
+        if (!next.next) next.next = {}
         this._merge(
           node.next,
           next.next,
