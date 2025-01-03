@@ -5,7 +5,8 @@
     ".": "./package/mod.ts",
     "./res": "./package/res.ts",
     "./router": "./package/router.ts",
-    "./server": "./package/server.ts"
+    "./server": "./package/server.ts",
+    "./route": "./package/route.ts"
   },
   "publish": {
     "exclude": ["./tests", ".rest", ".ignore.ts"]
@@ -24,7 +25,6 @@
     }
   },
   "imports": {
-    "@std/assert": "jsr:@std/assert@^1.0.9",
-    "zod": "npm:zod@^3.24.1"
+    "@std/assert": "jsr:@std/assert@^1.0.9"
   }
 }

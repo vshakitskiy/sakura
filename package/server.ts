@@ -21,14 +21,10 @@
  */
 
 import { Branch } from "./router.ts"
-import type { Method } from "./router.ts"
+import type { Method, StringRecordDef } from "./utils.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
-import type { SafeParseReturnType as SafeParse } from "zod"
-
-type RecordRaw = {
-  [x: string]: any
-}
+import type { Petal, PetalAny } from "./route.ts"
 
 /**
  * Creates request's inital seed.
@@ -51,10 +47,10 @@ export type GenSeed<Seed> = (req: Request) => Seed | Promise<Seed>
  */
 export const sakura = <Seed>(seed: GenSeed<Seed>): {
   seed: GenSeed<Seed>
-  branch: () => Branch<Seed, Seed>
+  branch: () => Branch<Seed, Seed, PetalAny>
 } => ({
   seed,
-  branch: () => Branch.create<Seed>(),
+  branch: () => Branch.init<Seed>(),
 })
 
 /**
@@ -84,7 +80,7 @@ export const bloom = <InitSeed, CurrSeed>({
   quiet,
 }: {
   seed: GenSeed<InitSeed>
-  branch: Branch<InitSeed, CurrSeed>
+  branch: Branch<InitSeed, CurrSeed, PetalAny>
   port?: number
   unknown?: ({ req, seed }: {
     req: Request
@@ -117,6 +113,8 @@ export const bloom = <InitSeed, CurrSeed>({
     const now = Date.now()
     const url = new URL(req.url)
 
+    const matchFunc = branch.finalize()
+
     const resp = await (async () => {
       const initSeed = await init(req)
 
@@ -133,31 +131,30 @@ export const bloom = <InitSeed, CurrSeed>({
           )
         }
 
-        const match = branch.match(req.method as Method, url.pathname)
+        const match = matchFunc(req.method as Method, url.pathname)
 
         if (!match) {
           if (unknown) return unknown({ req, seed: initSeed })
           else return fall(404, { message: "not found" })
         }
-        const { handler: { mutation, petal, schemas } } = match
-        const seed = await mutation(initSeed)
+        const { route, params } = match
+        const seed = await route.mutation(initSeed)
 
-        let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
-        let query: SafeParse<RecordRaw, RecordRaw> | RecordRaw = getQuery(url)
-        let json: SafeParse<any, any> | any = await getBody(req)
+        // let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
+        const query = getQuery(url)
+        // let json: SafeParse<any, any> | any = await getBody(req)
 
-        if (schemas) {
-          if (schemas.params) params = schemas.params.safeParse(params)
-          if (schemas.query) query = schemas.query.safeParse(query)
-          if (schemas.body) json = schemas.body.safeParse(json)
-        }
+        // if (schemas) {
+        //   if (schemas.params) params = schemas.params.safeParse(params)
+        //   if (schemas.query) query = schemas.query.safeParse(query)
+        //   if (schemas.body) json = schemas.body.safeParse(json)
+        // }
 
-        return petal({
-          req,
+        return route.handler({
           seed,
           params,
           query,
-          json: req.method === "GET" ? undefined : json,
+          body: null,
         })
       } catch (err: unknown) {
         if (err instanceof SakuraError) return fall(err.status, err.body)
@@ -180,9 +177,7 @@ export const bloom = <InitSeed, CurrSeed>({
 }
 
 const getQuery = (url: URL) => {
-  const query: {
-    [x: string]: any
-  } = {}
+  const query: StringRecordDef = {}
   for (const [key, val] of url.searchParams) {
     query[key] = val
   }
