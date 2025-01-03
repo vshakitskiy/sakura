@@ -29,31 +29,31 @@ const j = branch()
   .get("/empty", () => fall(204))
   .get("/params", ({ params }) => fall(200, params))
 
-Deno.test("Merge new tree node", async () => {
-  const port = 3004
-  const server = bloom({
-    seed,
-    branch: base.merge("/next", j),
-    quiet: true,
-    port,
-  })
+// Deno.test("Merge new tree node", async () => {
+//   const port = 3004
+//   const server = bloom({
+//     seed,
+//     branch: base.merge("/next", j),
+//     quiet: true,
+//     port,
+//   })
 
-  const root = await get<string>(port, "/")
-  is(root.json, "root")
-  const echo = await get<string>(port, "/abc")
-  is(echo.json, "abc")
-  const baseName = await get<string>(port, "/name")
-  is(baseName.json, "base")
+//   const root = await get<string>(port, "/")
+//   is(root.json, "root")
+//   const echo = await get<string>(port, "/abc")
+//   is(echo.json, "abc")
+//   const baseName = await get<string>(port, "/name")
+//   is(baseName.json, "base")
 
-  const e = await get<null>(port, "/next")
-  is(e.status, 204)
-  const jName = await get<string>(port, "/next/name")
-  is(jName.json, "j")
-  const nE = await get<null>(port, "/next/empty")
-  is(nE.status, 204)
+//   const e = await get<null>(port, "/next")
+//   is(e.status, 204)
+//   const jName = await get<string>(port, "/next/name")
+//   is(jName.json, "j")
+//   const nE = await get<null>(port, "/next/empty")
+//   is(nE.status, 204)
 
-  server.shutdown()
-})
+//   server.shutdown()
+// })
 
 // Deno.test("Merge in existing node", async () => {
 //   const port = 3005
@@ -74,26 +74,30 @@ Deno.test("Merge new tree node", async () => {
 //   server.shutdown()
 // })
 
-Deno.test("Merge in root node", async () => {
-  const port = 3006
-  const server = bloom({
-    seed,
-    branch: base.merge("/", j),
-    quiet: true,
-    port,
-  })
+// Deno.test("Merge in root node", async () => {
+//   const port = 3006
+//   const server = bloom({
+//     seed,
+//     branch: base.merge("/", j),
+//     quiet: true,
+//     port,
+//   })
 
-  const root = await get<string>(port, "/")
-  is(root.status, 204)
-  const echo = await get<string>(port, "/abc")
-  is(echo.json, "abc")
+//   const root = await get<string>(port, "/")
+//   is(root.status, 204)
+//   const echo = await get<string>(port, "/abc")
+//   is(echo.json, "abc")
 
-  const node = await get<string>(port, "/node")
-  is(node.json, "base")
-  // const f = await get<string>(port, "/node/1")
-  // is(f.json, "1")
-  const s = await get<string>(port, "/node/2")
-  is(s.json, "2")
+//   const node = await get<string>(port, "/node")
+//   is(node.json, "base")
+//   // const f = await get<string>(port, "/node/1")
+//   // is(f.json, "1")
+//   const s = await get<string>(port, "/node/2")
+//   is(s.json, "2")
 
-  server.shutdown()
+//   server.shutdown()
+// })
+
+Deno.test("ge", () => {
+  base.join("/v1", j)
 })

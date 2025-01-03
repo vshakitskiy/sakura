@@ -20,6 +20,7 @@ import type {
   ZodTypeAny as ZodAny,
 } from "zod"
 import type { OnSchema, PartialRecord, RecordRaw } from "./utils.ts"
+import { deepClone } from "./utils.ts"
 
 type ZodRecordRaw = ZodObject<RawShape>
 
@@ -173,6 +174,34 @@ export class Branch<InitSeed, CurrSeed> {
     )
   }
 
+  public join<CurrAnySeed>(
+    path: string,
+    branch: Branch<InitSeed, CurrAnySeed>,
+  ) {
+    const clone = deepClone(this.handlers)
+    let curr = clone
+    const node = branch.raw
+
+    const parts = path.split("/").filter(Boolean)
+    for (const part of parts) {
+      const isParam = part.startsWith(":")
+      const key = isParam ? ":" : part
+      if (!curr.next) curr.next = {}
+      if (!curr.next[key]) curr.next[key] = { next: null }
+      curr = curr.next[key]
+
+      // if (isParam) {
+      //   if (!curr.param) curr.param = {}
+      //   curr.param[method] = part.slice(1)
+      // }
+    }
+    console.dir(clone, {
+      depth: null,
+    })
+    curr = node as unknown as HandlersTree<InitSeed, CurrSeed>
+    return new Branch<InitSeed, CurrSeed>(curr, this.mutation)
+  }
+
   // @TODO: merge with dynamic path
   public merge<CurrAnySeed>(
     path: string,
@@ -196,15 +225,6 @@ export class Branch<InitSeed, CurrSeed> {
       // }
     }
 
-    // console.log("%c\nCURRENT HANDLER:\n", "color: orange")
-    // console.dir(copy, {
-    //   depth: null,
-    // })
-    // console.log(`%c\nCONNECT AT PATH ${path}:\n`, "color: orange")
-    // console.dir(node, {
-    //   depth: null,
-    // })
-
     copyNode(
       node as unknown as HandlersTree<InitSeed, CurrSeed>,
       currNode,
@@ -215,14 +235,6 @@ export class Branch<InitSeed, CurrSeed> {
       node.next as Record<string, HandlersTree<InitSeed, CurrSeed>> | null,
       currNode.next,
     )
-
-    console.dir(copy, {
-      depth: null,
-    })
-    console.log("%c\nRESULT:\n", "color: orange")
-    console.dir(this.handlers, {
-      depth: null,
-    })
 
     return new Branch<InitSeed, CurrSeed>(
       copy,
