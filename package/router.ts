@@ -12,13 +12,8 @@
  * @module
  * ```
  */
-import type { HandlerArg, Petal, PetalAny } from "./route.ts"
-import type {
-  Method as M,
-  Return,
-  SeedMutation,
-  StringRecordDef,
-} from "./utils.ts"
+import type { Handler, Petal, PetalAny } from "./route.ts"
+import type { Method as M, SeedMutation } from "./utils.ts"
 
 /**
  * Creates new branch that appends to the blooming sakura later.
@@ -67,27 +62,31 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       mutation: async (seed) => mutation(await this.mutation(seed)),
     })
 
-  // @TODO: method for every http method
+  public method =
+    <Method extends M>(method: Method) =>
+    (path: string, handler: Handler<SeedTo, Method>) =>
+      this.append(method, path, handler)
 
   public append = <Method extends M>(
     method: Method,
     path: string,
-    handler: (
-      arg: HandlerArg<SeedTo, StringRecordDef, StringRecordDef, any>,
-    ) => Return<Response>,
+    handler: Handler<SeedTo, Method>,
   ) => {
-    const petal: Petal<SeedFrom, SeedTo, M> = {
+    const petal = {
       mutation: this.mutation,
       method,
       path,
       handler,
-    }
+    } as Petal<SeedFrom, SeedTo, M>
 
     return new Branch({
       petals: new Set([...this.petals, petal]),
       mutation: this.mutation,
     })
   }
+
+  public get = this.method("GET")
+  public post = this.method("POST")
 
   public merge = <Prefix extends `/${string}`, DiffR extends PetalAny>(
     prefix: Prefix,
@@ -115,10 +114,10 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       routes.get(route.path)!.set(route.method, route)
     }
 
-    return (method: M, path: string) => this.match(routes, method, path)
+    return (method: M, path: string) => this._match(routes, method, path)
   }
 
-  private match(
+  private _match(
     routes: Map<string, Map<M, PetalAny>>,
     method: M,
     path: string,
@@ -145,10 +144,10 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       }
 
       if (matches) {
-        const route = handlers.get(method)
-        if (route) {
+        const petal = handlers.get(method)
+        if (petal) {
           return {
-            route,
+            petal,
             params,
           }
         }

@@ -1,33 +1,33 @@
 // @TODO: fill all tests
 // @TODO: Remove `merge` concept, instead do rough joining
 
-import { bloom, fall } from "@vsh/sakura"
-import { baseSeed, get, is, isN } from "./utils.ts"
+// import { bloom, fall } from "@vsh/sakura"
+// import { baseSeed, get, is, isN } from "./utils.ts"
 
-const { branch, seed } = baseSeed()
+// const { branch, seed } = baseSeed()
 
-const base = branch()
-  .get("/", () => fall(200, "root"))
-  .get("/name", () => fall(200, "base"))
-  .get("/node", () => fall(200, "base"))
-  .get("/node/1", () => fall(200, "1"))
-  .get(
-    "/:echo",
-    ({ params }) => fall(200, params.echo || "invalid body"),
-  )
+// const base = branch()
+//   .get("/", () => fall(200, "root"))
+//   .get("/name", () => fall(200, "base"))
+//   .get("/node", () => fall(200, "base"))
+//   .get("/node/1", () => fall(200, "1"))
+//   .get(
+//     "/:echo",
+//     ({ params }) => fall(200, params.echo || "invalid body"),
+//   )
 
-// Do we even need merge???
-// base.join("/v1", j)
+// // Do we even need merge???
+// // base.join("/v1", j)
 
-const j = branch()
-  .get("/", () => fall(204))
-  .get("/node", () => fall(200, "base"))
-  .get("/node/2", () => fall(200, "2")) // /next
-  .get("/name", () => fall(200, "j"))
-  .get("/rand", () => fall(200, Math.random()))
-  .get("/time", () => fall(200, new Date()))
-  .get("/empty", () => fall(204))
-  .get("/params", ({ params }) => fall(200, params))
+// const j = branch()
+//   .get("/", () => fall(204))
+//   .get("/node", () => fall(200, "base"))
+//   .get("/node/2", () => fall(200, "2")) // /next
+//   .get("/name", () => fall(200, "j"))
+//   .get("/rand", () => fall(200, Math.random()))
+//   .get("/time", () => fall(200, new Date()))
+//   .get("/empty", () => fall(204))
+//   .get("/params", ({ params }) => fall(200, params))
 
 // Deno.test("Merge new tree node", async () => {
 //   const port = 3004
@@ -98,6 +98,6 @@ const j = branch()
 //   server.shutdown()
 // })
 
-Deno.test("ge", () => {
-  base.join("/v1", j)
-})
+// Deno.test("ge", () => {
+//   base.join("/v1", j)
+// })

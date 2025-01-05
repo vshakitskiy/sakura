@@ -24,7 +24,7 @@ import { Branch } from "./router.ts"
 import type { Method, StringRecordDef } from "./utils.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
-import type { Petal, PetalAny } from "./route.ts"
+import type { PetalAny } from "./route.ts"
 
 /**
  * Creates request's inital seed.
@@ -112,7 +112,7 @@ export const bloom = <InitSeed, CurrSeed>({
   }, async (req) => {
     const now = Date.now()
     const url = new URL(req.url)
-
+    const method = req.method as Method
     const matchFunc = branch.finalize()
 
     const resp = await (async () => {
@@ -132,16 +132,18 @@ export const bloom = <InitSeed, CurrSeed>({
         }
 
         const match = matchFunc(req.method as Method, url.pathname)
-
         if (!match) {
-          if (unknown) return unknown({ req, seed: initSeed })
-          else return fall(404, { message: "not found" })
+          return unknown
+            ? unknown({ req, seed: initSeed })
+            : fall(404, { message: "not found" })
         }
-        const { route, params } = match
-        const seed = await route.mutation(initSeed)
+
+        const { petal, params } = match
+        const seed = await petal.mutation(initSeed)
+
+        const query = getQuery(url)
 
         // let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
-        const query = getQuery(url)
         // let json: SafeParse<any, any> | any = await getBody(req)
 
         // if (schemas) {
@@ -150,11 +152,12 @@ export const bloom = <InitSeed, CurrSeed>({
         //   if (schemas.body) json = schemas.body.safeParse(json)
         // }
 
-        return route.handler({
+        return petal.handler({
           seed,
+          req,
           params,
           query,
-          body: null,
+          body: method !== "GET" ? await getBody(req) : undefined,
         })
       } catch (err: unknown) {
         if (err instanceof SakuraError) return fall(err.status, err.body)
@@ -167,9 +170,11 @@ export const bloom = <InitSeed, CurrSeed>({
         } else return fall(500, { message: "internal server error" })
       }
     })()
+
     if (logger) {
-      if (typeof logger === "boolean") defaultLogger(now, req, resp, url)
-      else logger({ req, res: resp, now })
+      typeof logger === "boolean"
+        ? defaultLogger(now, req, resp, url)
+        : logger({ req, res: resp, now })
     }
 
     return resp
