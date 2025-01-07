@@ -3,9 +3,11 @@
 import type {
   Method as M,
   Return,
+  Schema,
   SeedMutation,
   StringRecordDef,
 } from "./utils.ts"
+import type { ExtractSchema } from "./utils.ts"
 
 export type HandlerArg<Seed, Params, Query, Body> = {
   req: Request
@@ -25,23 +27,34 @@ export type HandlerArgAny<Seed> = HandlerArg<
 export type ArgByMethod<Arg extends HandlerArgAny<unknown>, Method extends M> =
   Method extends "GET" ? Omit<Arg, "body"> : Arg
 
-export type Handler<Seed, Method extends M> = (
-  arg: ArgByMethod<HandlerArgAny<Seed>, Method>,
+export type Handler<Seed, Method extends M, Body extends Schema> = (
+  arg: ArgByMethod<
+    HandlerArg<
+      Seed,
+      StringRecordDef,
+      StringRecordDef,
+      [Body] extends [never] ? any : ExtractSchema<Body>["output"]
+    >,
+    Method
+  >,
 ) => Return<Response>
 
 export type Petal<
   SeedFrom,
   SeedTo,
   Method extends M,
+  Body extends Schema,
 > = {
   mutation: SeedMutation<SeedFrom, SeedTo>
+  body?: Body
   method: Method
   path: string
-  handler: Handler<SeedTo, Method>
+  handler: Handler<SeedTo, Method, Body>
 }
 
 export type PetalAny<SeedFrom = any, SeedTo = any> = Petal<
   SeedFrom,
   SeedTo,
-  any
+  any,
+  Schema<any, any>
 >

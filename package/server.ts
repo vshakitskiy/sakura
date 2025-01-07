@@ -143,6 +143,12 @@ export const bloom = <InitSeed, CurrSeed>({
 
         const query = getQuery(url)
 
+        let body = undefined
+        if (method !== "GET") {
+          body = await getBody(req)
+          if (petal.body) body = await petal.body.parse(body)
+        }
+
         // let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
         // let json: SafeParse<any, any> | any = await getBody(req)
 
@@ -157,7 +163,7 @@ export const bloom = <InitSeed, CurrSeed>({
           req,
           params,
           query,
-          body: method !== "GET" ? await getBody(req) : undefined,
+          body,
         })
       } catch (err: unknown) {
         if (err instanceof SakuraError) return fall(err.status, err.body)
@@ -189,18 +195,14 @@ const getQuery = (url: URL) => {
   return query
 }
 
-const getBody = async (req: Request) => {
+const getBody = (req: Request) => {
   const isInvalid = !req.body ||
     req.headers.get("Content-Length") === "0" ||
     !req.headers.get("Content-Type")
 
   if (isInvalid) return null
 
-  try {
-    return await req.json()
-  } catch (_) {
-    return null
-  }
+  return req.json()
 }
 
 const defaultLogger = (now: number, req: Request, res: Response, url: URL) => {

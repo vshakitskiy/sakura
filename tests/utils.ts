@@ -7,7 +7,7 @@ export type Msg = { message: string }
 export const baseSeed = () => sakura((req) => ({ req }))
 
 export const run = async (
-  petal: Handler<any, any>,
+  petal: Handler<any, any, never>,
   seed: GenSeed<any>,
   req: Request = new Request(""),
 ) => {

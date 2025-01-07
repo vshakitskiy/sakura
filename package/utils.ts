@@ -27,3 +27,23 @@ export type Method = "GET" | "POST" | "DELETE" | "PUT" | "PATCH"
 export type SeedMutation<From, To> = (
   seed: From,
 ) => Return<To>
+
+export interface Schema<Output = any, Input = Output> {
+  parse: (value: unknown) => Output
+  _input: Input
+}
+
+export type ExtractSchema<T> = T extends Schema<
+  infer Output,
+  infer Input
+> ? {
+    output: Output
+    input: Input
+  }
+  : never
+
+export const toSchema = <T>(parse: (value: unknown) => T): Schema<T, T> => {
+  return {
+    parse,
+  } as Schema<T, T>
+}

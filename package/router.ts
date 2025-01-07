@@ -13,7 +13,8 @@
  * ```
  */
 import type { Handler, Petal, PetalAny } from "./route.ts"
-import type { Method as M, SeedMutation } from "./utils.ts"
+import type { Method as M, Schema, SeedMutation } from "./utils.ts"
+import { toSchema } from "./utils.ts"
 
 /**
  * Creates new branch that appends to the blooming sakura later.
@@ -64,20 +65,29 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
 
   public method =
     <Method extends M>(method: Method) =>
-    (path: string, handler: Handler<SeedTo, Method>) =>
-      this.append(method, path, handler)
+    <Body extends Schema = never>(
+      path: string,
+      handler: Handler<SeedTo, Method, Body>,
+      schemas?: {
+        body?: Body
+      },
+    ) => this.append(method, path, handler, schemas)
 
-  public append = <Method extends M>(
+  public append = <Method extends M, Body extends Schema = never>(
     method: Method,
     path: string,
-    handler: Handler<SeedTo, Method>,
+    handler: Handler<SeedTo, Method, Body>,
+    schemas?: {
+      body?: Body
+    },
   ) => {
     const petal = {
       mutation: this.mutation,
       method,
       path,
       handler,
-    } as Petal<SeedFrom, SeedTo, M>
+      body: schemas?.body?.parse ? toSchema(schemas.body.parse) : undefined,
+    } as Petal<SeedFrom, SeedTo, M, Body>
 
     return new Branch({
       petals: new Set([...this.petals, petal]),
