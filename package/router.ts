@@ -21,8 +21,8 @@ import { toSchema } from "./utils.ts"
  *
  * @example
  * ```ts
- * // Not recommended, use sakura function instead
- * const raw = Branch.create<{ req: Request }>()
+ * const raw = Branch.init<{ req: Request }>
+ *
  * // Recommended
  * const { seed, branch } = sakura((req) => ({ req }))
  * const main = branch().get("/", () => fall(418))
@@ -35,9 +35,21 @@ import { toSchema } from "./utils.ts"
  * ```
  */
 export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
-  petals: Set<Petals>
-  mutation: SeedMutation<SeedFrom, SeedTo>
+  // @TODO: fill examples in jsdoc
 
+  /**
+   * Set of petals.
+   */
+  public petals: Set<Petals>
+
+  /**
+   * Mutates initial seed into the latest form of seed.
+   */
+  public mutation: SeedMutation<SeedFrom, SeedTo>
+
+  /**
+   * Creates empty branch with basic mutation function.
+   */
   public static init = <SeedInit>(): Branch<SeedInit, SeedInit, never> =>
     new Branch<SeedInit, SeedInit, never>({
       petals: new Set(),
@@ -55,6 +67,9 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     this.mutation = mutation
   }
 
+  /**
+   * Updates mutation function that will mutate the last form of the seed.
+   */
   public with = <SeedNext>(
     mutation: SeedMutation<SeedTo, SeedNext>,
   ): Branch<SeedFrom, SeedNext, Petals> =>
@@ -63,7 +78,7 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       mutation: async (seed) => mutation(await this.mutation(seed)),
     })
 
-  public method =
+  private method =
     <Method extends M>(method: Method) =>
     <Body extends Schema = never>(
       path: string,
@@ -71,33 +86,36 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       schemas?: {
         body?: Body
       },
-    ) => this.append(method, path, handler, schemas)
+    ) => this._append(method, path, handler, schemas)
 
-  public append = <Method extends M, Body extends Schema = never>(
-    method: Method,
-    path: string,
-    handler: Handler<SeedTo, Method, Body>,
-    schemas?: {
-      body?: Body
-    },
-  ) => {
-    const petal = {
-      mutation: this.mutation,
-      method,
-      path,
-      handler,
-      body: schemas?.body?.parse ? toSchema(schemas.body.parse) : undefined,
-    } as Petal<SeedFrom, SeedTo, M, Body>
-
-    return new Branch({
-      petals: new Set([...this.petals, petal]),
-      mutation: this.mutation,
-    })
-  }
-
+  /**
+   * Corresponds to the GET http method.
+   */
   public get = this.method("GET")
+
+  /**
+   * Corresponds to the POST http method.
+   */
   public post = this.method("POST")
 
+  /**
+   * Corresponds to the PUT http method.
+   */
+  public put = this.method("PUT")
+
+  /**
+   * Corresponds to the PATCH http method.
+   */
+  public patch = this.method("PATCH")
+
+  /**
+   * Corresponds to the DELETE http method.
+   */
+  public delete = this.method("DELETE")
+
+  /**
+   * Merges one branch into another by prefix. Mutations of each other are not affected.
+   */
   public merge = <Prefix extends `/${string}`, DiffR extends PetalAny>(
     prefix: Prefix,
     branch: Branch<SeedFrom, unknown, DiffR>,
@@ -108,11 +126,14 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     }))
 
     return new Branch({
-      petals: new Set([...this.petals, ...toAppend]),
+      petals: new Set([...toAppend, ...this.petals]),
       mutation: this.mutation,
     })
   }
 
+  /**
+   * Returns match function to search petal by method and path.
+   */
   public finalize = () => {
     const routes = new Map<string, Map<M, PetalAny>>()
 
@@ -132,10 +153,11 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     method: M,
     path: string,
   ) {
-    const params: Record<string, string> = {}
     const pathSegments = path.split("/").filter(Boolean)
+    let params: Record<string, string> = {}
 
     for (const [routePath, handlers] of routes) {
+      params = {}
       const routeSegments = routePath.split("/").filter(Boolean)
 
       if (routeSegments.length !== pathSegments.length) continue
@@ -165,5 +187,27 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     }
 
     return null
+  }
+
+  private _append = <Method extends M, Body extends Schema = never>(
+    method: Method,
+    path: string,
+    handler: Handler<SeedTo, Method, Body>,
+    schemas?: {
+      body?: Body
+    },
+  ) => {
+    const petal = {
+      mutation: this.mutation,
+      method,
+      path,
+      handler,
+      body: schemas?.body?.parse ? toSchema(schemas.body.parse) : undefined,
+    } as Petal<SeedFrom, SeedTo, M, Body>
+
+    return new Branch({
+      petals: new Set([petal, ...this.petals]),
+      mutation: this.mutation,
+    })
   }
 }

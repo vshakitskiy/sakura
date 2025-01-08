@@ -1,5 +1,5 @@
 import { Branch, fall } from "@vsh/sakura"
-import { baseSeed, empty, exists, is, plug, run } from "./utils.ts"
+import { empty, exists, is, plug, run } from "./utils.ts"
 
 const branch = Branch.init<{ req: Request }>
 

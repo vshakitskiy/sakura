@@ -21,7 +21,7 @@
  */
 
 import { Branch } from "./router.ts"
-import type { Method, StringRecordDef } from "./utils.ts"
+import type { Method, StringRecord } from "./utils.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
 import type { PetalAny } from "./route.ts"
@@ -188,7 +188,7 @@ export const bloom = <InitSeed, CurrSeed>({
 }
 
 const getQuery = (url: URL) => {
-  const query: StringRecordDef = {}
+  const query: StringRecord = {}
   for (const [key, val] of url.searchParams) {
     query[key] = val
   }

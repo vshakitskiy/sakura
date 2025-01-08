@@ -63,8 +63,8 @@ export const pluck = (
   status: number,
   json?: any,
   headers?: HeadersInit,
-): never => {
-  throw new SakuraError(status, json, headers)
+): SakuraError => {
+  return new SakuraError(status, json, headers)
 }
 
 /**

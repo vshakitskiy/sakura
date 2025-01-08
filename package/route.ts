@@ -5,7 +5,7 @@ import type {
   Return,
   Schema,
   SeedMutation,
-  StringRecordDef,
+  StringRecord,
 } from "./utils.ts"
 import type { ExtractSchema } from "./utils.ts"
 
@@ -19,8 +19,8 @@ export type HandlerArg<Seed, Params, Query, Body> = {
 
 export type HandlerArgAny<Seed> = HandlerArg<
   Seed,
-  StringRecordDef,
-  StringRecordDef,
+  StringRecord,
+  StringRecord,
   any
 >
 
@@ -31,8 +31,8 @@ export type Handler<Seed, Method extends M, Body extends Schema> = (
   arg: ArgByMethod<
     HandlerArg<
       Seed,
-      StringRecordDef,
-      StringRecordDef,
+      StringRecord,
+      StringRecord,
       [Body] extends [never] ? any : ExtractSchema<Body>["output"]
     >,
     Method

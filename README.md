@@ -5,21 +5,39 @@
 ## Example
 
 ```ts
-import { bloom, fall, sakura } from "@vsh/sakura"
+import { bloom, fall, pluck, sakura } from "@vsh/sakura"
 
 // Define the time we started server at
-const time = Date.now()
+const uptime = Date.now()
 
 // Seed is generated on every request. We can pass any utilities inside of it.
 const { branch, seed } = sakura((req) => ({
   req,
-  runtime: Date.now() - time,
+  runtime: Date.now() - uptime,
 }))
 
-// Create branch with /ping & /runtime endpoints
+// Create branch with /ping, /runtime and /secret endpoints
 const main = branch()
   .get("/ping", () => fall(200, { message: "pong" }))
-  .get("/runtime", (_, { runtime }) => fall(200, { runtime }))
+  .get("/runtime", ({ seed: { runtime } }) => fall(200, { runtime }))
+  .with((seed) => {
+    // get `SECRET` header
+    const secret = seed.req.headers.get("SECRET")
+
+    if (!secret) {
+      // exit mutation with the response
+      throw pluck(400, {
+        message: "secret is not provided",
+      })
+    }
+
+    // return new seed
+    return {
+      ...seed,
+      secret,
+    }
+  })
+  .get("/secret", ({ seed: { secret } }) => fall(200, { secret }))
 
 // start the server
 bloom({
@@ -34,6 +52,7 @@ bloom({
   unknown: () => fall(404, { message: "unknown endpoint" }),
 
   port: 4040,
-  log: true,
+  logger: true,
 })
+
 ```

@@ -1,5 +1,3 @@
-// import type { SafeParseReturnType as SafeParse, z, ZodTypeAny } from "zod"
-
 export type PartialRecord<K extends keyof any, T> = {
   [P in K]?: T
 }
@@ -8,13 +6,11 @@ export type RecordRaw = {
   [x: string]: any
 }
 
-// export type OnSchema<T, ZodType extends ZodTypeAny, Deafult> = T extends ZodType
-//   ? SafeParse<Deafult, z.infer<T>>
-//   : Deafult
-
+/**
+ * Value in different architecture
+ */
 export type Return<Value> = Value | Promise<Value>
-export type AnyRecordDef = Record<string, any>
-export type StringRecordDef = Record<string, string>
+export type StringRecord = Record<string, string>
 
 /**
  * Request's method.
@@ -22,7 +18,7 @@ export type StringRecordDef = Record<string, string>
 export type Method = "GET" | "POST" | "DELETE" | "PUT" | "PATCH"
 
 /**
- * Mutates seed and returns it.
+ * Mutates seed and returns the new form.
  */
 export type SeedMutation<From, To> = (
   seed: From,
