@@ -1,5 +1,5 @@
 import { fall, sakura } from "@vsh/sakura"
-import type { GenSeed, Petal } from "@vsh/sakura"
+import type { GenSeed, Handler } from "@vsh/sakura"
 import { assertEquals, assertExists, AssertionError } from "@std/assert"
 
 export type Msg = { message: string }
@@ -7,14 +7,13 @@ export type Msg = { message: string }
 export const baseSeed = () => sakura((req) => ({ req }))
 
 export const run = async (
-  petal: Petal<any>,
+  petal: Handler<any, any, never>,
   seed: GenSeed<any>,
   req: Request = new Request(""),
 ) => {
   return await petal({
     params: {},
     query: {},
-    json: null,
     req,
     seed: await seed(req),
   })

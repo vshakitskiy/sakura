@@ -8,126 +8,62 @@
  * const match = Branch.create<{ req: Request }>()
  *  .get("/ping", () => fall(200, { message: "pong" }))
  *  .match("GET", "/ping")
- *
- * @module
  * ```
+ * @module
  */
-
+import type { Handler, Petal, PetalAny } from "./route.ts"
 import type {
-  SafeParseReturnType as SafeParse,
-  ZodObject,
-  ZodRawShape as RawShape,
-  ZodTypeAny as ZodAny,
-} from "zod"
-import type { OnSchema, PartialRecord, RecordRaw } from "./utils.ts"
+  Method as M,
+  PartialRecord,
+  Schema,
+  SeedMutation,
+  StringRecord,
+} from "./utils.ts"
+import { toSchema } from "./utils.ts"
 
-type ZodRecordRaw = ZodObject<RawShape>
-
-export type ExtractSeed<T> = T extends Branch<any, infer CurrSeed> ? CurrSeed
-  : never
-
-/**
- * Request's method.
- */
-export type Method = "GET" | "POST" | "DELETE" | "PUT" | "PATCH"
-
-/**
- * Mutates seed and returns it.
- */
-export type Mutation<From, To> = (
-  seed: From,
-) => To | Promise<To>
-
-type PetalMeta<
-  CurrSeed,
-  Params,
-  Query,
-  Body,
-> = {
-  req: Request
-  seed: CurrSeed
-  params: Params
-  query: Query
-  json: Body
+export type RoutesTree<SeedFrom, SeedTo, Petals extends PetalAny> = {
+  next: Record<string, RoutesTree<SeedFrom, SeedTo, Petals>>
+  petals: PartialRecord<M, Petal<SeedFrom, SeedTo, M, Schema<any, any>>>
+  params: PartialRecord<M, string>
 }
 
-/**
- * Function with the metadata of the request: params, query, body json and last mutated seed.
- * If Zod schemas provided, metadata contains result of metadata's parsing.
- */
-export type Petal<
-  Meta = PetalMeta<
-    any,
-    SafeParse<RecordRaw, RecordRaw> | RecordRaw,
-    SafeParse<RecordRaw, RecordRaw> | RecordRaw,
-    SafeParse<any, any> | any
-  >,
-  Method = string,
-> = (
-  meta: Method extends "GET" ? Omit<Meta, "json"> : Meta,
-) => Promise<Response> | Response
-
-type Schemas = {
-  params: ZodRecordRaw
-  query: ZodRecordRaw
-  body: ZodAny
+const initNode = () => {
+  return {
+    next: {},
+    petals: {},
+    params: {},
+  }
 }
 
-type DefaultSchema = {
-  params: undefined
-  query: undefined
-  body: undefined
+export type Schemas<Body extends Schema> = {
+  body?: Body
 }
 
-/**
- * Contains the last mutation and response function
- */
-export type Handler<InitSeed, CurrSeed> = {
-  petal: Petal<
-    PetalMeta<
-      any,
-      SafeParse<RecordRaw, RecordRaw> | RecordRaw,
-      SafeParse<RecordRaw, RecordRaw> | RecordRaw,
-      SafeParse<any, any> | any
-    >
-  >
-  mutation: Mutation<InitSeed, CurrSeed>
-  schemas?: Schemas
-}
+type Match<SeedFrom, SeedTo> = (method: M, path: string) => {
+  petal: Petal<SeedFrom, SeedTo, M, Schema<any, any>>
+  params: StringRecord
+} | null
 
-/**
- * Represents handlers as a tree.
- */
-export type HandlersTree<InitSeed, CurrSeed> = {
-  next: Record<string, HandlersTree<InitSeed, CurrSeed>> | null
-  handler?: PartialRecord<Method, Handler<InitSeed, CurrSeed>>
-  param?: PartialRecord<Method, string>
-}
-
-// @TODO: incorrect 'schemas' arg type
-type BranchMethod<InitSeed, CurrSeed, Method> = <
-  Z extends Partial<Schemas> = Partial<DefaultSchema>,
+type OnMethod<Method extends M, SeedFrom, SeedTo, Petals extends PetalAny> = <
+  Body extends Schema = never,
 >(
   path: string,
-  petal: Petal<
-    PetalMeta<
-      CurrSeed,
-      OnSchema<Z["params"], ZodRecordRaw, RecordRaw>,
-      OnSchema<Z["query"], ZodRecordRaw, RecordRaw>,
-      OnSchema<Z["body"], ZodAny, any>
-    >,
-    Method
-  >,
-  schemas?: Z & Method extends "GET" ? Omit<Z, "body"> : Z,
-) => Branch<InitSeed, CurrSeed>
+  handler: Handler<SeedTo, Method, Body>,
+  schemas?: Method extends "GET" ? Omit<Schemas<Body>, "body">
+    : Schemas<Body>,
+) => Branch<
+  SeedFrom,
+  SeedTo,
+  Petals | Petal<SeedFrom, SeedTo, M, Body>
+>
 
 /**
  * Creates new branch that appends to the blooming sakura later.
  *
  * @example
  * ```ts
- * // Not recommended, use sakura function instead
- * const raw = Branch.create<{ req: Request }>()
+ * const raw = Branch.init<{ req: Request }>
+ *
  * // Recommended
  * const { seed, branch } = sakura((req) => ({ req }))
  * const main = branch().get("/", () => fall(418))
@@ -139,214 +75,244 @@ type BranchMethod<InitSeed, CurrSeed, Method> = <
  * })
  * ```
  */
-export class Branch<InitSeed, CurrSeed> {
-  private handlers: HandlersTree<InitSeed, CurrSeed>
-  private mutation: Mutation<InitSeed, CurrSeed>
+export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
+  // @TODO: fill examples in jsdoc
 
-  constructor(
-    handlers: HandlersTree<InitSeed, CurrSeed>,
-    mutation: Mutation<InitSeed, CurrSeed>,
-  ) {
-    this.handlers = handlers
+  /**
+   * Set of petals.
+   */
+  public petals: Set<Petals>
+
+  /**
+   * Mutates initial seed into the latest form of seed.
+   */
+  public mutation: SeedMutation<SeedFrom, SeedTo>
+
+  /**
+   * Creates empty branch with basic mutation function.
+   */
+  public static init = <SeedInit>(): Branch<SeedInit, SeedInit, PetalAny> =>
+    new Branch<SeedInit, SeedInit, PetalAny>({
+      petals: new Set(),
+      mutation: (seed) => seed,
+    })
+
+  constructor({
+    petals,
+    mutation,
+  }: {
+    petals: Set<Petals>
+    mutation: SeedMutation<SeedFrom, SeedTo>
+  }) {
+    this.petals = petals
     this.mutation = mutation
   }
 
-  public static create<Context>(): Branch<Context, Context> {
-    return new Branch<Context, Context>({
-      next: {},
-    }, (seed) => seed)
-  }
+  /**
+   * Updates mutation function that will mutate the last form of the seed.
+   */
+  public with = <SeedNext>(
+    mutation: SeedMutation<SeedTo, SeedNext>,
+  ): Branch<SeedFrom, SeedNext, Petals> =>
+    new Branch<SeedFrom, SeedNext, Petals>({
+      petals: this.petals,
+      mutation: async (seed) => mutation(await this.mutation(seed)),
+    })
 
-  public get raw() {
-    return this.handlers
-  }
+  private method = <Method extends M>(
+    method: Method,
+  ): OnMethod<Method, SeedFrom, SeedTo, Petals> =>
+  (
+    path,
+    handler,
+    schemas?,
+  ) => this._append(method, path, handler, schemas)
 
-  public with<MutatedSeed>(
-    mutation: Mutation<CurrSeed, MutatedSeed>,
-  ): Branch<InitSeed, MutatedSeed> {
-    return new Branch<InitSeed, MutatedSeed>(
-      this.handlers as unknown as HandlersTree<InitSeed, MutatedSeed>,
-      async (seed) => {
-        const currSeed = await this.mutation(seed)
-        return mutation(currSeed)
-      },
-    )
-  }
+  /**
+   * Corresponds to the GET http method.
+   */
+  public get: OnMethod<"GET", SeedFrom, SeedTo, Petals> = this.method("GET")
 
-  // @TODO: merge with dynamic path
-  public merge<CurrAnySeed>(
-    path: string,
-    branch: Branch<InitSeed, CurrAnySeed>,
-  ) {
-    let currNode = this.handlers
-    const node = branch.raw
+  /**
+   * Corresponds to the POST http method.
+   */
+  public post: OnMethod<"POST", SeedFrom, SeedTo, Petals> = this.method("POST")
 
-    const parts = path.split("/").filter(Boolean)
-    for (const part of parts) {
-      const isParam = part.startsWith(":")
-      const key = isParam ? ":" : part
-      if (!currNode.next) currNode.next = {}
-      if (!currNode.next[key]) currNode.next[key] = { next: null }
-      currNode = currNode.next[key]
+  /**
+   * Corresponds to the PUT http method.
+   */
+  public put: OnMethod<"PUT", SeedFrom, SeedTo, Petals> = this.method("PUT")
 
-      // if (isParam) {
-      //   if (!currNode.param) currNode.param = {}
-      //   currNode.param[method] = part.slice(1)
-      // }
-    }
+  /**
+   * Corresponds to the PATCH http method.
+   */
+  public patch: OnMethod<"PATCH", SeedFrom, SeedTo, Petals> = this.method(
+    "PATCH",
+  )
 
-    // console.log("%c\nCURRENT HANDLER:\n", "color: orange")
-    // console.dir(this.handlers, {
-    //   depth: null,
-    // })
-    // console.log(`%c\nCONNECT AT PATH ${path}:\n`, "color: orange")
-    // console.dir(node, {
-    //   depth: null,
-    // })
-
-    copyNode(
-      node as unknown as HandlersTree<InitSeed, CurrSeed>,
-      currNode,
-    )
-
-    if (!currNode.next) currNode.next = {}
-    this._merge(
-      node.next as Record<string, HandlersTree<InitSeed, CurrSeed>> | null,
-      currNode.next,
-    )
-
-    // console.log("%c\nRESULT:\n", "color: orange")
-    // console.dir(this.handlers, {
-    //   depth: null,
-    // })
-
-    return new Branch<InitSeed, CurrSeed>(
-      this.handlers,
-      this.mutation,
-    )
-  }
-
-  private _merge(
-    from: Record<string, HandlersTree<InitSeed, CurrSeed>> | null,
-    to: Record<string, HandlersTree<InitSeed, CurrSeed>> | null,
-  ) {
-    if (!from || !to) return
-
-    for (const [path, node] of Object.entries(from)) {
-      if (!to[path]) to[path] = { next: null }
-      const next = to[path]
-
-      copyNode(node, next)
-
-      if (node.next) {
-        next.next = {}
-        this._merge(
-          node.next,
-          next.next,
-        )
-      }
-    }
-  }
-
-  public get: BranchMethod<InitSeed, CurrSeed, "GET"> = this.method("GET")
-  public post: BranchMethod<InitSeed, CurrSeed, "POST"> = this.method("POST")
-  public put: BranchMethod<InitSeed, CurrSeed, "PUT"> = this.method("PUT")
-  public delete: BranchMethod<InitSeed, CurrSeed, "DELETE"> = this.method(
+  /**
+   * Corresponds to the DELETE http method.
+   */
+  public delete: OnMethod<"DELETE", SeedFrom, SeedTo, Petals> = this.method(
     "DELETE",
   )
-  public patch: BranchMethod<InitSeed, CurrSeed, "PATCH"> = this.method("PATCH")
 
-  private method(method: Method): BranchMethod<InitSeed, CurrSeed, Method> {
-    return (path, petal, schemas?) => this.append(method, path, petal, schemas)
+  /**
+   * Merges one branch into another by prefix. Mutations of each other are not affected.
+   */
+  public merge = <Prefix extends `/${string}`, DiffR extends PetalAny>(
+    prefix: Prefix,
+    branch: Branch<SeedFrom, any, DiffR>,
+  ): Branch<SeedFrom, SeedTo, Petals> => {
+    const toAppend = [...branch.petals].map((petal) => ({
+      ...petal,
+      path: `${prefix}${petal.path}`,
+    }))
+
+    return new Branch({
+      petals: new Set([...this.petals, ...toAppend]),
+      mutation: this.mutation,
+    }) as Branch<SeedFrom, SeedTo, Petals>
   }
 
-  private append<Z extends Partial<Schemas>>(
-    method: Method,
-    path: string,
-    petal: Petal<
-      PetalMeta<
-        CurrSeed,
-        OnSchema<Z["params"], ZodRecordRaw, RecordRaw>,
-        OnSchema<Z["query"], ZodRecordRaw, RecordRaw>,
-        OnSchema<Z["body"], ZodAny, any>
-      >,
-      Method
-    >,
-    schemas?: Z & Method extends "GET" ? Omit<Z, "body"> : Z,
-  ): Branch<InitSeed, CurrSeed> {
-    const handler = { petal, mutation: this.mutation, schemas }
+  /**
+   * Returns match function to search petal by method and path.
+   */
+  public finalize = (): Match<SeedFrom, SeedTo> => {
+    const node: RoutesTree<SeedFrom, SeedTo, Petals> = {
+      next: {},
+      petals: {},
+      params: {},
+    }
 
-    const parts = path.split("/").filter(Boolean)
-    let node = this.handlers
+    for (const petal of this.petals) {
+      this._appendNode(node, petal)
+    }
+
+    return (method, path) => this._matchTree(node, method, path)
+  }
+
+  /**
+   * Returns match function to search petal by method and path.
+   * @deprecated use finalize() instead, since _finalize() uses slower match algorithm.
+   */
+  public _finalize = (): Match<SeedFrom, SeedTo> => {
+    const routes = new Map<string, Map<M, PetalAny>>()
+
+    for (const route of this.petals) {
+      if (!routes.has(route.path)) {
+        routes.set(route.path, new Map())
+      }
+
+      routes.get(route.path)!.set(route.method, route)
+    }
+
+    return (method: M, path: string) => this._matchMap(routes, method, path)
+  }
+
+  private _appendNode = (
+    root: RoutesTree<SeedFrom, SeedTo, Petals>,
+    petal: Petals,
+  ) => {
+    const parts = petal.path.split("/").filter(Boolean)
+    let node = root
+
     for (const part of parts) {
       const isParam = part.startsWith(":")
       const key = isParam ? ":" : part
-      if (!node.next) node.next = {}
-      if (!node.next[key]) node.next[key] = { next: null }
+
+      if (!node.next[key]) node.next[key] = initNode()
       node = node.next[key]
 
-      if (isParam) {
-        if (!node.param) node.param = {}
-        node.param[method] = part.slice(1)
-      }
+      if (isParam) node.params[petal.method] = part.slice(1)
     }
 
-    if (!node.handler) {
-      node.handler = {}
-    }
-
-    // @ts-ignore joining custom types with default types
-    node.handler[method] = handler
-
-    return new Branch<InitSeed, CurrSeed>(
-      this.handlers,
-      this.mutation,
-    )
+    node.petals[petal.method] = petal
   }
 
-  public match(method: Method, path: string): {
-    handler: Handler<InitSeed, CurrSeed>
-    params: Record<string, string>
-  } | null {
-    let node = this.handlers
+  private _matchTree = (
+    tree: RoutesTree<SeedFrom, SeedTo, Petals>,
+    method: M,
+    path: string,
+  ) => {
+    let node = tree
     const parts = path.split("/").filter(Boolean)
-    const params: Record<string, string> = {}
+    const params: StringRecord = {}
 
     for (const part of parts) {
-      if (!node.next) return null
-      else if (node.next[part]) node = node.next[part]
+      if (node.next[part]) node = node.next[part]
       else if (node.next[":"]) {
         node = node.next[":"]
-        params[node.param![method]!] = part
+        params[node.params[method]!] = part
       } else return null
     }
 
-    return node.handler && node.handler[method]
+    return node.petals[method]
       ? {
-        handler: node.handler[method],
+        petal: node.petals[method],
         params,
       }
       : null
   }
-}
 
-const copyNode = <InitSeed, CurrSeed>(
-  from: HandlersTree<InitSeed, CurrSeed>,
-  to: HandlersTree<InitSeed, CurrSeed>,
-) => {
-  if (from.handler) {
-    if (!to.handler) to.handler = {}
+  private _matchMap(
+    routes: Map<string, Map<M, PetalAny>>,
+    method: M,
+    path: string,
+  ) {
+    const pathSegments = path.split("/").filter(Boolean)
+    let params: Record<string, string> = {}
 
-    for (const [method, handler] of Object.entries(from.handler)) {
-      to.handler[method as Method] = handler
+    for (const [routePath, handlers] of routes) {
+      params = {}
+      const routeSegments = routePath.split("/").filter(Boolean)
+
+      if (routeSegments.length !== pathSegments.length) continue
+
+      let matches = true
+      for (let i = 0; i < routeSegments.length; i++) {
+        const routeSegment = routeSegments[i]
+        const pathSegment = pathSegments[i]
+
+        if (routeSegment && pathSegment && routeSegment.startsWith(":")) {
+          params[routeSegment.slice(1)] = pathSegment
+        } else if (routeSegment !== pathSegment) {
+          matches = false
+          break
+        }
+      }
+
+      if (matches) {
+        const petal = handlers.get(method)
+        if (petal) {
+          return {
+            petal,
+            params,
+          }
+        }
+      }
     }
+
+    return null
   }
 
-  if (from.param) {
-    if (!to.param) to.param = {}
+  private _append = <Method extends M, Body extends Schema = never>(
+    method: Method,
+    path: string,
+    handler: Handler<SeedTo, Method, Body>,
+    schemas?: Schemas<Body>,
+  ) => {
+    const petal = {
+      mutation: this.mutation,
+      method,
+      path,
+      handler,
+      body: schemas?.body?.parse ? toSchema(schemas.body.parse) : undefined,
+    } as Petal<SeedFrom, SeedTo, M, Body>
 
-    for (const [method, param] of Object.entries(from.param)) {
-      to.param[method as Method] = param
-    }
+    return new Branch({
+      petals: new Set([...this.petals, petal]),
+      mutation: this.mutation,
+    })
   }
 }

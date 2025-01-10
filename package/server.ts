@@ -21,14 +21,10 @@
  */
 
 import { Branch } from "./router.ts"
-import type { Method } from "./router.ts"
+import type { Method, StringRecord } from "./utils.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
-import type { SafeParseReturnType as SafeParse } from "zod"
-
-type RecordRaw = {
-  [x: string]: any
-}
+import type { PetalAny } from "./route.ts"
 
 /**
  * Creates request's inital seed.
@@ -51,10 +47,10 @@ export type GenSeed<Seed> = (req: Request) => Seed | Promise<Seed>
  */
 export const sakura = <Seed>(seed: GenSeed<Seed>): {
   seed: GenSeed<Seed>
-  branch: () => Branch<Seed, Seed>
+  branch: () => Branch<Seed, Seed, PetalAny>
 } => ({
   seed,
-  branch: () => Branch.create<Seed>(),
+  branch: () => Branch.init<Seed>(),
 })
 
 /**
@@ -62,7 +58,7 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
  *
  * @example
  * ```ts
- * const mainBranch = branch().get("/", (req, seed) => {
+ * const mainBranch = branch().get("/", ({ req, seed }) => {
  *   // ...
  * })
  *
@@ -84,7 +80,7 @@ export const bloom = <InitSeed, CurrSeed>({
   quiet,
 }: {
   seed: GenSeed<InitSeed>
-  branch: Branch<InitSeed, CurrSeed>
+  branch: Branch<InitSeed, CurrSeed, PetalAny>
   port?: number
   unknown?: ({ req, seed }: {
     req: Request
@@ -116,6 +112,8 @@ export const bloom = <InitSeed, CurrSeed>({
   }, async (req) => {
     const now = Date.now()
     const url = new URL(req.url)
+    const method = req.method as Method
+    const matchFunc = branch.finalize()
 
     const resp = await (async () => {
       const initSeed = await init(req)
@@ -133,31 +131,39 @@ export const bloom = <InitSeed, CurrSeed>({
           )
         }
 
-        const match = branch.match(req.method as Method, url.pathname)
-
+        const match = matchFunc(req.method as Method, url.pathname)
         if (!match) {
-          if (unknown) return unknown({ req, seed: initSeed })
-          else return fall(404, { message: "not found" })
-        }
-        const { handler: { mutation, petal, schemas } } = match
-        const seed = await mutation(initSeed)
-
-        let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
-        let query: SafeParse<RecordRaw, RecordRaw> | RecordRaw = getQuery(url)
-        let json: SafeParse<any, any> | any = await getBody(req)
-
-        if (schemas) {
-          if (schemas.params) params = schemas.params.safeParse(params)
-          if (schemas.query) query = schemas.query.safeParse(query)
-          if (schemas.body) json = schemas.body.safeParse(json)
+          return unknown
+            ? unknown({ req, seed: initSeed })
+            : fall(404, { message: "not found" })
         }
 
-        return petal({
-          req,
+        const { petal, params } = match
+        const seed = await petal.mutation(initSeed)
+
+        const query = getQuery(url)
+
+        let body = undefined
+        if (method !== "GET") {
+          body = await getBody(req)
+          if (petal.body) body = await petal.body.parse(body)
+        }
+
+        // let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
+        // let json: SafeParse<any, any> | any = await getBody(req)
+
+        // if (schemas) {
+        //   if (schemas.params) params = schemas.params.safeParse(params)
+        //   if (schemas.query) query = schemas.query.safeParse(query)
+        //   if (schemas.body) json = schemas.body.safeParse(json)
+        // }
+
+        return petal.handler({
           seed,
+          req,
           params,
           query,
-          json: req.method === "GET" ? undefined : json,
+          body,
         })
       } catch (err: unknown) {
         if (err instanceof SakuraError) return fall(err.status, err.body)
@@ -170,9 +176,11 @@ export const bloom = <InitSeed, CurrSeed>({
         } else return fall(500, { message: "internal server error" })
       }
     })()
+
     if (logger) {
-      if (typeof logger === "boolean") defaultLogger(now, req, resp, url)
-      else logger({ req, res: resp, now })
+      typeof logger === "boolean"
+        ? defaultLogger(now, req, resp, url)
+        : logger({ req, res: resp, now })
     }
 
     return resp
@@ -180,27 +188,21 @@ export const bloom = <InitSeed, CurrSeed>({
 }
 
 const getQuery = (url: URL) => {
-  const query: {
-    [x: string]: any
-  } = {}
+  const query: StringRecord = {}
   for (const [key, val] of url.searchParams) {
     query[key] = val
   }
   return query
 }
 
-const getBody = async (req: Request) => {
+const getBody = (req: Request) => {
   const isInvalid = !req.body ||
     req.headers.get("Content-Length") === "0" ||
     !req.headers.get("Content-Type")
 
   if (isInvalid) return null
 
-  try {
-    return await req.json()
-  } catch (_) {
-    return null
-  }
+  return req.json()
 }
 
 const defaultLogger = (now: number, req: Request, res: Response, url: URL) => {
