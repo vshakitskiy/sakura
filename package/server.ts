@@ -58,7 +58,7 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
  *
  * @example
  * ```ts
- * const mainBranch = branch().get("/", (req, seed) => {
+ * const mainBranch = branch().get("/", ({ req, seed }) => {
  *   // ...
  * })
  *

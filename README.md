@@ -54,5 +54,4 @@ bloom({
   port: 4040,
   logger: true,
 })
-
 ```

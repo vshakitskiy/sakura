@@ -1,6 +1,10 @@
-// @TODO: fill file with route logic
+/**
+ * Contains types related to routes.
+ * @module
+ */
 
 import type {
+  Method,
   Method as M,
   Return,
   Schema,
@@ -55,6 +59,6 @@ export type Petal<
 export type PetalAny<SeedFrom = any, SeedTo = any> = Petal<
   SeedFrom,
   SeedTo,
-  any,
+  Method,
   Schema<any, any>
 >

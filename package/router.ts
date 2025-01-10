@@ -8,13 +8,54 @@
  * const match = Branch.create<{ req: Request }>()
  *  .get("/ping", () => fall(200, { message: "pong" }))
  *  .match("GET", "/ping")
- *
- * @module
  * ```
+ * @module
  */
 import type { Handler, Petal, PetalAny } from "./route.ts"
-import type { Method as M, Schema, SeedMutation } from "./utils.ts"
+import type {
+  Method as M,
+  PartialRecord,
+  Schema,
+  SeedMutation,
+  StringRecord,
+} from "./utils.ts"
 import { toSchema } from "./utils.ts"
+
+export type RoutesTree<SeedFrom, SeedTo, Petals extends PetalAny> = {
+  next: Record<string, RoutesTree<SeedFrom, SeedTo, Petals>>
+  petals: PartialRecord<M, Petal<SeedFrom, SeedTo, M, Schema<any, any>>>
+  params: PartialRecord<M, string>
+}
+
+const initNode = () => {
+  return {
+    next: {},
+    petals: {},
+    params: {},
+  }
+}
+
+export type Schemas<Body extends Schema> = {
+  body?: Body
+}
+
+type Match<SeedFrom, SeedTo> = (method: M, path: string) => {
+  petal: Petal<SeedFrom, SeedTo, M, Schema<any, any>>
+  params: StringRecord
+} | null
+
+type OnMethod<Method extends M, SeedFrom, SeedTo, Petals extends PetalAny> = <
+  Body extends Schema = never,
+>(
+  path: string,
+  handler: Handler<SeedTo, Method, Body>,
+  schemas?: Method extends "GET" ? Omit<Schemas<Body>, "body">
+    : Schemas<Body>,
+) => Branch<
+  SeedFrom,
+  SeedTo,
+  Petals | Petal<SeedFrom, SeedTo, M, Body>
+>
 
 /**
  * Creates new branch that appends to the blooming sakura later.
@@ -50,8 +91,8 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
   /**
    * Creates empty branch with basic mutation function.
    */
-  public static init = <SeedInit>(): Branch<SeedInit, SeedInit, never> =>
-    new Branch<SeedInit, SeedInit, never>({
+  public static init = <SeedInit>(): Branch<SeedInit, SeedInit, PetalAny> =>
+    new Branch<SeedInit, SeedInit, PetalAny>({
       petals: new Set(),
       mutation: (seed) => seed,
     })
@@ -78,63 +119,84 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       mutation: async (seed) => mutation(await this.mutation(seed)),
     })
 
-  private method =
-    <Method extends M>(method: Method) =>
-    <Body extends Schema = never>(
-      path: string,
-      handler: Handler<SeedTo, Method, Body>,
-      schemas?: {
-        body?: Body
-      },
-    ) => this._append(method, path, handler, schemas)
+  private method = <Method extends M>(
+    method: Method,
+  ): OnMethod<Method, SeedFrom, SeedTo, Petals> =>
+  (
+    path,
+    handler,
+    schemas?,
+  ) => this._append(method, path, handler, schemas)
 
   /**
    * Corresponds to the GET http method.
    */
-  public get = this.method("GET")
+  public get: OnMethod<"GET", SeedFrom, SeedTo, Petals> = this.method("GET")
 
   /**
    * Corresponds to the POST http method.
    */
-  public post = this.method("POST")
+  public post: OnMethod<"POST", SeedFrom, SeedTo, Petals> = this.method("POST")
 
   /**
    * Corresponds to the PUT http method.
    */
-  public put = this.method("PUT")
+  public put: OnMethod<"PUT", SeedFrom, SeedTo, Petals> = this.method("PUT")
 
   /**
    * Corresponds to the PATCH http method.
    */
-  public patch = this.method("PATCH")
+  public patch: OnMethod<"PATCH", SeedFrom, SeedTo, Petals> = this.method(
+    "PATCH",
+  )
 
   /**
    * Corresponds to the DELETE http method.
    */
-  public delete = this.method("DELETE")
+  public delete: OnMethod<"DELETE", SeedFrom, SeedTo, Petals> = this.method(
+    "DELETE",
+  )
 
   /**
    * Merges one branch into another by prefix. Mutations of each other are not affected.
    */
   public merge = <Prefix extends `/${string}`, DiffR extends PetalAny>(
     prefix: Prefix,
-    branch: Branch<SeedFrom, unknown, DiffR>,
-  ) => {
+    branch: Branch<SeedFrom, any, DiffR>,
+  ): Branch<SeedFrom, SeedTo, Petals> => {
     const toAppend = [...branch.petals].map((petal) => ({
       ...petal,
       path: `${prefix}${petal.path}`,
     }))
 
     return new Branch({
-      petals: new Set([...toAppend, ...this.petals]),
+      petals: new Set([...this.petals, ...toAppend]),
       mutation: this.mutation,
-    })
+    }) as Branch<SeedFrom, SeedTo, Petals>
   }
 
   /**
    * Returns match function to search petal by method and path.
    */
-  public finalize = () => {
+  public finalize = (): Match<SeedFrom, SeedTo> => {
+    const node: RoutesTree<SeedFrom, SeedTo, Petals> = {
+      next: {},
+      petals: {},
+      params: {},
+    }
+
+    for (const petal of this.petals) {
+      this._appendNode(node, petal)
+    }
+
+    return (method, path) => this._matchTree(node, method, path)
+  }
+
+  /**
+   * Returns match function to search petal by method and path.
+   * @deprecated use finalize() instead, since _finalize() uses slower match algorithm.
+   */
+  public _finalize = (): Match<SeedFrom, SeedTo> => {
     const routes = new Map<string, Map<M, PetalAny>>()
 
     for (const route of this.petals) {
@@ -145,10 +207,55 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       routes.get(route.path)!.set(route.method, route)
     }
 
-    return (method: M, path: string) => this._match(routes, method, path)
+    return (method: M, path: string) => this._matchMap(routes, method, path)
   }
 
-  private _match(
+  private _appendNode = (
+    root: RoutesTree<SeedFrom, SeedTo, Petals>,
+    petal: Petals,
+  ) => {
+    const parts = petal.path.split("/").filter(Boolean)
+    let node = root
+
+    for (const part of parts) {
+      const isParam = part.startsWith(":")
+      const key = isParam ? ":" : part
+
+      if (!node.next[key]) node.next[key] = initNode()
+      node = node.next[key]
+
+      if (isParam) node.params[petal.method] = part.slice(1)
+    }
+
+    node.petals[petal.method] = petal
+  }
+
+  private _matchTree = (
+    tree: RoutesTree<SeedFrom, SeedTo, Petals>,
+    method: M,
+    path: string,
+  ) => {
+    let node = tree
+    const parts = path.split("/").filter(Boolean)
+    const params: StringRecord = {}
+
+    for (const part of parts) {
+      if (node.next[part]) node = node.next[part]
+      else if (node.next[":"]) {
+        node = node.next[":"]
+        params[node.params[method]!] = part
+      } else return null
+    }
+
+    return node.petals[method]
+      ? {
+        petal: node.petals[method],
+        params,
+      }
+      : null
+  }
+
+  private _matchMap(
     routes: Map<string, Map<M, PetalAny>>,
     method: M,
     path: string,
@@ -193,9 +300,7 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     method: Method,
     path: string,
     handler: Handler<SeedTo, Method, Body>,
-    schemas?: {
-      body?: Body
-    },
+    schemas?: Schemas<Body>,
   ) => {
     const petal = {
       mutation: this.mutation,
@@ -206,7 +311,7 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     } as Petal<SeedFrom, SeedTo, M, Body>
 
     return new Branch({
-      petals: new Set([petal, ...this.petals]),
+      petals: new Set([...this.petals, petal]),
       mutation: this.mutation,
     })
   }

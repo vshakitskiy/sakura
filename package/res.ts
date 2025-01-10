@@ -5,11 +5,11 @@
  * ```ts
  * import { pluck, fall } from "@vsh/sakura"
  *
- * const branch =
- *   .with((seed) => {
- *     const session = seed.getSession()
+ * const main = branch()
+ *   .with(({ getSession }) => {
+ *     const session = getSession()
  *     if (!session) {
- *       pluck(401, { message: "Unauthorized" })
+ *       throw pluck(401, { message: "Unauthorized" })
  *     }
  *
  *     return {
@@ -17,10 +17,9 @@
  *       session
  *     }
  *   })
- *   .get("/session", () => fall(200, session))
- *
- * @module
+ *   .get("/session", ({ seed }) => fall(200, seed.session))
  * ```
+ * @module
  */
 
 /**
@@ -47,12 +46,12 @@ export class SakuraError extends Error {
  *
  * @example
  * ```ts
- * import { SakuraError } from "@vsh/sakura"
+ * import { pluck } from "@vsh/sakura"
  *
  * // Later on the branch...
  * .with((seed) => {
  *   if (!seed.getSession()) {
- *     pluck(401, { message: "Unauthorized" })
+ *     throw pluck(401, { message: "Unauthorized" })
  *   }
  *
  *   return seed
@@ -72,7 +71,7 @@ export const pluck = (
  *
  * @example
  * ```ts
- * import { SakuraError } from "@vsh/sakura"
+ * import { fall } from "@vsh/sakura"
  *
  * // Later on the branch...
  * .get("/ping", () => fall(200, { message: "pong" }))
