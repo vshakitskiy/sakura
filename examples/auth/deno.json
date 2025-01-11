@@ -1,9 +1,17 @@
 {
   "tasks": {
-    "dev": "deno run --watch main.ts"
+    "dev": "deno run --watch --allow-net --allow-read --allow-env --unstable-kv main.ts"
   },
-
   "fmt": {
     "semiColons": false
-  }
+  },
+  "imports": {
+    "@std/http": "jsr:@std/http@^1.0.12",
+    "@vsh/sakura": "jsr:@vsh/sakura@^0.3.1",
+    "djwt": "https://deno.land/x/djwt@v3.0.2/mod.ts",
+    "bcrypt": "https://deno.land/x/bcrypt@v0.4.1/mod.ts",
+    "@/": "./",
+    "zod": "npm:zod@^3.24.1"
+  },
+  "patch": ["../../"]
 }

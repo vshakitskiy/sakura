@@ -84,11 +84,11 @@ export const fall = (
 ): Response => {
   const body = json ? JSON.stringify(json) : null
 
+  const h = new Headers(headers)
+  h.set("content-type", "application/json")
+
   return new Response(body, {
     status,
-    headers: {
-      ...headers,
-      "Content-type": "application/json",
-    },
+    headers: h,
   })
 }

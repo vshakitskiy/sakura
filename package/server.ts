@@ -157,8 +157,7 @@ export const bloom = <InitSeed, CurrSeed>({
         //   if (schemas.query) query = schemas.query.safeParse(query)
         //   if (schemas.body) json = schemas.body.safeParse(json)
         // }
-
-        return petal.handler({
+        return await petal.handler({
           seed,
           req,
           params,
@@ -166,8 +165,9 @@ export const bloom = <InitSeed, CurrSeed>({
           body,
         })
       } catch (err: unknown) {
-        if (err instanceof SakuraError) return fall(err.status, err.body)
-        else if (error) {
+        if (err instanceof SakuraError) {
+          return fall(err.status, err.body, err.headers)
+        } else if (error) {
           try {
             return error({ error: err, seed: initSeed })
           } catch (_) {
