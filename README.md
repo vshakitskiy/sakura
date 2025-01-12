@@ -2,6 +2,16 @@
 
 ![PREVIEW](./preview.png)
 
+Sakura is a Deno HTTP framework build with zero dependencies,
+
+## Installation
+
+Install Sakura in your Deno project using this command:
+
+```sh
+deno add jsr:@vsh/sakura
+```
+
 ## Example
 
 ```ts
@@ -55,3 +65,5 @@ bloom({
   logger: true,
 })
 ```
+
+<!-- TODO: docs -->
