@@ -1,6 +1,6 @@
 {
   "name": "@vsh/sakura",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "exports": {
     ".": "./package/mod.ts",
     "./res": "./package/res.ts",
@@ -9,7 +9,14 @@
     "./route": "./package/route.ts"
   },
   "publish": {
-    "exclude": ["./tests", "./examples", ".rest", ".ignore.ts"]
+    "exclude": [
+      "./tests",
+      "./examples",
+      ".rest",
+      ".ignore.ts",
+      "preview.png",
+      ".github"
+    ]
   },
   "tasks": {
     "format": "deno fmt --check",
