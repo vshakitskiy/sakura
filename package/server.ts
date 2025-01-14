@@ -183,7 +183,9 @@ export const bloom = <InitSeed, CurrSeed>({
       }
     })()
 
-    resp.headers.set("Set-Cookie", cookies.parse())
+    // for (const cookie of cookies.parse()) {
+    //   resp.headers.append("Set-Cookie", cookie)
+    // }
 
     if (logger) {
       typeof logger === "boolean"

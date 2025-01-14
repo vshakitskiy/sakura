@@ -1,22 +1,44 @@
 // Source: https://jsr.io/@std/http/1.0.12/cookie.ts
 
-// @TODO: jsdocs
-// @TODO: delete cookie
-
 export interface Cookie {
+  /** Cookie's name. */
   name: string
+
+  /** Cookie's value. */
   value: string
+
+  /** Cookie's `Expires` attribute. Either explicit date or UTC milliseconds. */
   expires?: Date | number
+
+  /** Cookie's `Max-Age` attribute. Must be a non-negative integer */
   maxAge?: number
+
+  /** Cookie's `Domain` attribute. */
   domain?: string
+
+  /** Cookie's `Path` attribute. */
   path?: string
+
+  /** Cookie's `Secure` attribute. */
   secure?: boolean
+
+  /** Cookie's `HTTPOnly` attribute.  */
   httpOnly?: boolean
+
+  /** Cookie's `Partitioned` attribute. */
   partitioned?: boolean
+
+  /**
+   * Cookie's `SameSite` attribute.
+   * Declare whether your cookie is restricted to a first-party or same-site context.
+   */
   sameSite?: "Strict" | "Lax" | "None"
+
+  /** Additional key value pairs. */
   unparsed?: string[]
 }
 
+/** Cookie storage, that is parsing request cookies and cookies that will append to response's `Set-Cookie` header. */
 export class Cookies {
   private reqCookies: Record<string, string>
   private setCookies: Cookie[]
@@ -28,7 +50,20 @@ export class Cookies {
     this.parsed = []
   }
 
-  public set = (cookie: Cookie) => {
+  /**
+   * Appends cookie to the `Set-Cookie` header.
+   *
+   * @example
+   * ```ts
+   * branch().get("/", ({ cookies }) => {
+   *   cookies.set({ name: "runtime", value: "deno" })
+   *   cookies.set({ name: "test", value: "123" })
+   *   return fall(200)
+   * })
+   * // -> Set-Cookie: runtime=deno,test=123
+   * ```
+   */
+  public set = (cookie: Cookie): void => {
     const parsed = parseFromCookie(cookie)
 
     if (parsed) {
@@ -37,14 +72,59 @@ export class Cookies {
     }
   }
 
+  /**
+   * Extracts all cookies from request.
+   *
+   * @example
+   * ```ts
+   * branch().get("/", ({ cookies }) => {
+   *   const c = cookies.get<"runtime" | "test">()
+   *   return fall(200, c.runtime)
+   * })
+   * ```
+   */
   public get = <T extends string = string>() =>
     this.reqCookies as Record<T, string>
 
+  /**
+   * Lists all cookies that are appended with the `set()` method.
+   *
+   * @example
+   * ```ts
+   * branch().get("/", ({ cookies }) => {
+   *   cookies.set({ name: "key", value: "val" })
+   *   console.log(cookies.getSet())
+   *   // -> { name: "key", value: "val" }
+   *   return fall(200)
+   * })
+   * ```
+   */
   public getSet = () => this.setCookies
 
-  public parse = () => this.parsed.join(", ")
+  // @TODO: deleteCookie
+  /**
+   * Deletes cookie using `Set-Cookie` header.
+   */
+  public deleteCookie = (
+    name: string,
+    attributes?: Pick<
+      Cookie,
+      "path" | "domain" | "secure" | "httpOnly" | "partitioned"
+    >,
+  ) => {
+    this.set({
+      name,
+      value: "",
+      expires: new Date(0),
+      ...attributes,
+    })
+  }
+
+  /** Returns cookies from `set()` method parsed as a string. */
+  public parse = () => this.parsed
 }
 
+/** Extracts cookies from the header as `Record`. */
 export const getCookies = (headers: Headers) => {
   const cookie = headers.get("Cookie")
   if (cookie !== null) {
@@ -63,6 +143,7 @@ export const getCookies = (headers: Headers) => {
   return {}
 }
 
+/** Parses `Cookie` argument into ready-to-use string. */
 export const parseFromCookie = (cookie: Cookie): string => {
   if (!cookie.name) return ""
 
