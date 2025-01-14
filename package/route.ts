@@ -3,6 +3,7 @@
  * @module
  */
 
+import type { Cookies } from "./cookie.ts"
 import type {
   Method,
   Method as M,
@@ -19,6 +20,7 @@ export type HandlerArg<Seed, Params, Query, Body> = {
   params: Params
   query: Query
   body: Body
+  cookies: Cookies
 }
 
 export type HandlerArgAny<Seed> = HandlerArg<

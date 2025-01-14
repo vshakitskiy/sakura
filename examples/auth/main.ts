@@ -19,6 +19,7 @@ export const run = () => {
     port: 4040,
     logger: true,
     error: ({ error }) => {
+      console.log(error)
       if (error instanceof ZodError) {
         console.log(error.issues)
         return fall(400, {

@@ -25,11 +25,15 @@ import type { Method, StringRecord } from "./utils.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
 import type { PetalAny } from "./route.ts"
+import { Cookies } from "./cookie.ts"
 
 /**
  * Creates request's inital seed.
  */
-export type GenSeed<Seed> = (req: Request) => Seed | Promise<Seed>
+export type GenSeed<Seed> = (
+  req: Request,
+  cookies: Cookies,
+) => Seed | Promise<Seed>
 
 /**
  * Initialize branch function with the seed provided.
@@ -101,6 +105,7 @@ export const bloom = <InitSeed, CurrSeed>({
     | boolean
   quiet?: boolean
 }): Deno.HttpServer<Deno.NetAddr> => {
+  const matchFunc = branch.finalize()
   return Deno.serve({
     port,
     onListen: () =>
@@ -113,10 +118,10 @@ export const bloom = <InitSeed, CurrSeed>({
     const now = Date.now()
     const url = new URL(req.url)
     const method = req.method as Method
-    const matchFunc = branch.finalize()
+    const cookies = new Cookies(req)
 
     const resp = await (async () => {
-      const initSeed = await init(req)
+      const initSeed = await init(req, cookies)
 
       try {
         if (
@@ -163,6 +168,7 @@ export const bloom = <InitSeed, CurrSeed>({
           params,
           query,
           body,
+          cookies,
         })
       } catch (err: unknown) {
         if (err instanceof SakuraError) {
@@ -176,6 +182,8 @@ export const bloom = <InitSeed, CurrSeed>({
         } else return fall(500, { message: "internal server error" })
       }
     })()
+
+    resp.headers.set("Set-Cookie", cookies.parse())
 
     if (logger) {
       typeof logger === "boolean"
