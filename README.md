@@ -2,7 +2,8 @@
 
 ![PREVIEW](./preview.png)
 
-Sakura is a Deno HTTP framework build with zero dependencies,
+Sakura is a Deno HTTP framework build with zero dependencies and zod validation
+support.
 
 ## Installation
 
@@ -21,23 +22,24 @@ import { bloom, fall, pluck, sakura } from "@vsh/sakura"
 const uptime = Date.now()
 
 // Seed is generated on every request. We can pass any utilities inside of it.
-const { branch, seed } = sakura((req) => ({
+const { branch, seed } = sakura((req, cookies) => ({
   req,
+  cookies,
   runtime: Date.now() - uptime,
 }))
 
 // Create branch with /ping, /runtime and /secret endpoints
-const main = branch()
+const app = branch()
   .get("/ping", () => fall(200, { message: "pong" }))
   .get("/runtime", ({ seed: { runtime } }) => fall(200, { runtime }))
   .with((seed) => {
     // get `SECRET` header
-    const secret = seed.req.headers.get("SECRET")
+    const { secret } = seed.cookies.get<"secret">()
 
     if (!secret) {
       // exit mutation with the response
       throw pluck(400, {
-        message: "secret is not provided",
+        message: "secret is not provided.",
       })
     }
 
@@ -53,15 +55,18 @@ const main = branch()
 bloom({
   // Seed generator
   seed,
-  // Main branch
-  branch: main,
+  // Branch to run
+  branch: app,
 
   // Runs on error
   error: () => fall(500, { message: "try again later" }),
   // Runs if petal is not found
   unknown: () => fall(404, { message: "unknown endpoint" }),
-
+  // Runs if Content-type is application/json
+  unsupported: () => fall(415, { message: "body must be json" })
+  
   port: 4040,
+  // Log on each request
   logger: true,
 })
 ```

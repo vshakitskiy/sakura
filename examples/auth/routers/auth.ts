@@ -8,7 +8,7 @@ const auth = branch()
     await seed.kv.insertUser(body)
     return fall(201)
   }, { body: signUp })
-  .post("/signin", async ({ seed, body: { email, password } }) => {
+  .post("/signin", async ({ seed, body: { email, password }, cookies }) => {
     const user = await seed.kv.getUserByEmail(email)
     if (!user) return fall(401, "User with this email does not exists.")
 
@@ -19,9 +19,11 @@ const auth = branch()
       id: user.id,
     }, seed.jwt.day * 3)
 
-    return fall(200, user, {
-      Authorization: `Bearer ${accessToken}`,
+    cookies.set({
+      name: "accessToken",
+      value: accessToken,
     })
+    return fall(200, user)
   }, { body: signIn })
   .merge("/session", session)
 

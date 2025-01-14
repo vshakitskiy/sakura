@@ -11,7 +11,8 @@ export class MessageError extends Error {
 }
 
 const kv = await Kv.init()
-export const { seed, branch } = sakura((req) => ({
+export const { seed, branch } = sakura((req, cookies) => ({
+  cookies,
   req,
   jwt: {
     sign,

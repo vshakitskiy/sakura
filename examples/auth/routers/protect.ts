@@ -3,17 +3,12 @@ import { pluck } from "@vsh/sakura"
 
 const protect = branch()
   .with(async (seed) => {
-    const header = seed.req.headers
-    const auth = header.get("Authorization")
-    if (!auth) {
+    console.log(seed.cookies)
+    const token = seed.cookies.get()["accessToken"]
+
+    if (!token) {
       throw pluck(401, {
-        message: "Authorization header is not provided.",
-      })
-    }
-    const [type, token] = auth.split(" ")
-    if (type !== "Bearer" || !token) {
-      throw pluck(401, {
-        message: "Authorization header is invalid.",
+        message: "Unauthorized.",
       })
     }
 

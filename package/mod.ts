@@ -1,5 +1,6 @@
 export * from "./res.ts"
 export * from "./router.ts"
-export * from "./route.ts"
+export type { Handler } from "./route.ts"
 export * from "./server.ts"
 export type { Method, Return, SeedMutation, StringRecord } from "./utils.ts"
+export * from "./cookies.ts"
