@@ -2,7 +2,8 @@
 
 ![PREVIEW](./preview.png)
 
-Sakura is a Deno HTTP framework build with zero dependencies and zod validation support.
+Sakura is a Deno HTTP framework build with zero dependencies and zod validation
+support.
 
 ## Installation
 

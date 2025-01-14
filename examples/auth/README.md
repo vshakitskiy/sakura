@@ -24,7 +24,8 @@ This is an example app, that uses Sakura as HTTP framework.
 }
 ```
 
-`POST /auth/signin` - Authorizes user and returns his data with access token in the cookie.
+`POST /auth/signin` - Authorizes user and returns his data with access token in
+the cookie.
 
 ```json
 // Body schema
