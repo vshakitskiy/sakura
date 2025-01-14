@@ -112,7 +112,7 @@ export class Cookies {
       Cookie,
       "path" | "domain" | "secure" | "httpOnly" | "partitioned"
     >,
-  ) => {
+  ): void => {
     this.set({
       name,
       value: "",
@@ -126,7 +126,7 @@ export class Cookies {
 }
 
 /** Extracts cookies from the header as `Record`. */
-export const getCookies = (headers: Headers) => {
+export const getCookies = (headers: Headers): Record<string, string> => {
   const cookie = headers.get("Cookie")
   if (cookie !== null) {
     const out: Record<string, string> = {}
