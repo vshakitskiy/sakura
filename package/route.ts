@@ -3,7 +3,7 @@
  * @module
  */
 
-import type { Cookies } from "./cookie.ts"
+import type { Cookies } from "./cookies.ts"
 import type {
   Method,
   Method as M,
@@ -33,7 +33,7 @@ export type HandlerArgAny<Seed> = HandlerArg<
 export type ArgByMethod<Arg extends HandlerArgAny<unknown>, Method extends M> =
   Method extends "GET" ? Omit<Arg, "body"> : Arg
 
-export type Handler<Seed, Method extends M, Body extends Schema> = (
+export type Handler<Seed, Method extends M, Body extends Schema = never> = (
   arg: ArgByMethod<
     HandlerArg<
       Seed,

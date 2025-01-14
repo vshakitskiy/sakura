@@ -1,9 +1,10 @@
 {
   "name": "@vsh/sakura",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "exports": {
     ".": "./package/mod.ts",
     "./res": "./package/res.ts",
+    "./cookies": "./package/cookies.ts",
     "./router": "./package/router.ts",
     "./server": "./package/server.ts",
     "./route": "./package/route.ts"

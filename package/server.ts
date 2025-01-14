@@ -25,7 +25,7 @@ import type { Method, StringRecord } from "./utils.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
 import type { PetalAny } from "./route.ts"
-import { Cookies } from "./cookie.ts"
+import { Cookies } from "./cookies.ts"
 
 /**
  * Creates request's inital seed.
