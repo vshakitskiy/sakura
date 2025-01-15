@@ -188,7 +188,6 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     for (const petal of this.petals) {
       this._appendNode(node, petal)
     }
-
     return (method, path) => this._matchTree(node, method, path)
   }
 

@@ -21,11 +21,12 @@
  */
 
 import { Branch } from "./router.ts"
-import type { Method, StringRecord } from "./utils.ts"
+import type { Method, Return, StringRecord } from "./utils.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
 import type { PetalAny } from "./route.ts"
 import { Cookies } from "./cookies.ts"
+import type { BeforeHandler, ErrorHandler } from "./external.ts"
 
 /**
  * Creates request's inital seed.
@@ -33,7 +34,7 @@ import { Cookies } from "./cookies.ts"
 export type GenSeed<Seed> = (
   req: Request,
   cookies: Cookies,
-) => Seed | Promise<Seed>
+) => Return<Seed>
 
 /**
  * Initialize branch function with the seed provided.
@@ -86,16 +87,9 @@ export const bloom = <InitSeed, CurrSeed>({
   seed: GenSeed<InitSeed>
   branch: Branch<InitSeed, CurrSeed, PetalAny>
   port?: number
-  unknown?: ({ req, seed }: {
-    req: Request
-    seed: InitSeed
-  }) => Promise<Response> | Response
-  error?: (
-    { error, seed }: { error: unknown; seed: InitSeed },
-  ) => Promise<Response> | Response
-  unsupported?: (
-    { req, seed }: { req: Request; seed: InitSeed },
-  ) => Promise<Response> | Response
+  unknown?: BeforeHandler<InitSeed>
+  error?: ErrorHandler<InitSeed>
+  unsupported?: BeforeHandler<InitSeed>
   logger?:
     | (({ req, res, now }: {
       req: Request
@@ -154,14 +148,6 @@ export const bloom = <InitSeed, CurrSeed>({
           if (petal.body) body = await petal.body.parse(body)
         }
 
-        // let params: SafeParse<RecordRaw, RecordRaw> | RecordRaw = match.params
-        // let json: SafeParse<any, any> | any = await getBody(req)
-
-        // if (schemas) {
-        //   if (schemas.params) params = schemas.params.safeParse(params)
-        //   if (schemas.query) query = schemas.query.safeParse(query)
-        //   if (schemas.body) json = schemas.body.safeParse(json)
-        // }
         return await petal.handler({
           seed,
           req,
@@ -183,9 +169,9 @@ export const bloom = <InitSeed, CurrSeed>({
       }
     })()
 
-    // for (const cookie of cookies.parse()) {
-    //   resp.headers.append("Set-Cookie", cookie)
-    // }
+    for (const cookie of cookies.parse()) {
+      resp.headers.append("Set-Cookie", cookie)
+    }
 
     if (logger) {
       typeof logger === "boolean"
