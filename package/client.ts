@@ -38,12 +38,13 @@ export class SakuraClient<SeedFrom, SeedTo> {
     this.options = options || {}
   }
 
-  private method = async <Method extends M>(
+  private method = async <Method extends M, Body>(
     method: Method,
     path: `/${string}`,
     options?: Options<Method>,
   ) => {
-    const meta = await this.before(path, method)
+    const meta = await this.before(path, method, options)
+
     try {
       const match = await this.request(
         meta,
@@ -51,33 +52,75 @@ export class SakuraClient<SeedFrom, SeedTo> {
       )
       if (!match) return null
 
-      const res = await match.handler(match.arg)
-      return this.after(res, match.arg.cookies)
-    } catch (err: unknown) {
-      if (err instanceof SakuraError) {
-        return fall(err.status, err.body, err.headers)
-      }
+      const res = await (async () => {
+        try {
+          const res = await match.handler(match.arg)
+          return this.after(res, match.arg.cookies)
+        } catch (err: unknown) {
+          if (err instanceof SakuraError) {
+            return fall(err.status, err.body, err.headers)
+          }
 
-      if (this.options.error) {
-        return await this.options.error({
-          error: err,
-          seed: meta.initSeed,
-        })
+          if (this.options.error) {
+            try {
+              return await this.options.error({
+                error: err,
+                seed: meta.initSeed,
+              })
+            } catch (_) {
+              return fall(500)
+            }
+          }
+          return fall(500)
+        }
+      })()
+
+      const body = res.body ? await res.json() as Body : null
+
+      return {
+        res,
+        body,
+        cookies: match.arg.cookies,
       }
+    } catch (error) {
+      console.log(error)
+      return null
     }
   }
 
-  get = (path: `/${string}`, options?: Options<"GET">) =>
-    this.method("GET", path, options)
+  get = <Body>(path: `/${string}`, options?: Options<"GET">) =>
+    this.method<"GET", Body>("GET", path, options)
 
-  post = (path: `/${string}`, options?: Options<"POST">) =>
-    this.method("POST", path, options)
+  post = <Body>(path: `/${string}`, options?: Options<"POST">) =>
+    this.method<"POST", Body>("POST", path, options)
 
-  private before = async (path: `/${string}`, method: M) => {
+  put = <Body>(path: `/${string}`, options?: Options<"PUT">) =>
+    this.method<"PUT", Body>("PUT", path, options)
+
+  patch = <Body>(path: `/${string}`, options?: Options<"PATCH">) =>
+    this.method<"PATCH", Body>("PATCH", path, options)
+
+  delete = <Body>(path: `/${string}`, options?: Options<"DELETE">) =>
+    this.method<"DELETE", Body>("DELETE", path, options)
+
+  private before = async <Method extends M>(
+    path: `/${string}`,
+    method: Method,
+    options?: Options<Method>,
+  ) => {
     const url = new URL(`${defaultUrl}${path}`)
     const req = new Request(url.toString(), {
       method,
     })
+
+    if (options?.cookies) {
+      const cookies = Object.entries(options.cookies)
+        .map((entry) => entry.join("="))
+        .join("; ")
+
+      req.headers.set("Cookie", cookies)
+    }
+
     const cookies = new Cookies(req)
     const initSeed = await this.genSeed(req, cookies)
     return {
@@ -109,14 +152,6 @@ export class SakuraClient<SeedFrom, SeedTo> {
     if (!match) return null
     const { params, petal } = match
 
-    petal.handler
-    if (options?.cookies) {
-      const cookies = Object.entries(options.cookies)
-        .map((entry) => entry.join("="))
-        .join("; ")
-
-      req.headers.set("cookie", cookies)
-    }
     const query = getQuery(url)
 
     const seed = await petal.mutation(initSeed)

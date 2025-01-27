@@ -316,6 +316,8 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
   }
 }
 
+export type BranchAny = Branch<unknown, unknown, PetalAny>
+
 /** Extracts last `Seed` from the branch. */
 export type ExtractSeed<T> = T extends Branch<any, infer Seed, PetalAny> ? Seed
   : never
