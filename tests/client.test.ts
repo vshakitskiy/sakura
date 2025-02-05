@@ -71,5 +71,9 @@ Deno.test("Ensure cookies", async () => {
   is(res!.cookies.get(), { v: "0" })
 })
 
-Deno.test("Handle on error", () => {
+Deno.test("Handle on error", async () => {
+  const res = await client.get("/error")
+  exists(res)
+
+  is(res!.body, "some error")
 })
