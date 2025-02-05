@@ -7,7 +7,8 @@
     "./cookies": "./package/cookies.ts",
     "./router": "./package/router.ts",
     "./server": "./package/server.ts",
-    "./route": "./package/route.ts"
+    "./route": "./package/route.ts",
+    "./client": "./package/client.ts"
   },
   "publish": {
     "exclude": [

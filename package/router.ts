@@ -39,7 +39,7 @@ export type Schemas<Body extends Schema> = {
   body?: Body
 }
 
-type Match<SeedFrom, SeedTo> = (method: M, path: string) => {
+export type Match<SeedFrom, SeedTo> = (method: M, path: string) => {
   petal: Petal<SeedFrom, SeedTo, M, Schema<any, any>>
   params: StringRecord
 } | null
@@ -188,7 +188,6 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     for (const petal of this.petals) {
       this._appendNode(node, petal)
     }
-
     return (method, path) => this._matchTree(node, method, path)
   }
 
@@ -316,6 +315,8 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     })
   }
 }
+
+export type BranchAny = Branch<unknown, unknown, PetalAny>
 
 /** Extracts last `Seed` from the branch. */
 export type ExtractSeed<T> = T extends Branch<any, infer Seed, PetalAny> ? Seed
