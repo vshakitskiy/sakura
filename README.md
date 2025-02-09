@@ -101,8 +101,8 @@ intuitive way:
   processed.
 
 - **Falling Petals (Sending a Response):**\
-  Finally, just as petals fall from a tree at the end of their bloom, the act of
-  sending a response is represented by falling petals.
+  Just as petals fall from a tree at the end of their bloom, the act of sending
+  a response is represented by falling petals.
 
 <!-- TODO: docs -->
 
