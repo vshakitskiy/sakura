@@ -36,3 +36,6 @@ the cookie.
 ```
 
 `GET /auth/session` - Returns user data based on access token cookie provided.
+
+`POST /auth/session/out` - Removes user's access token cookie and returns empty
+body.

@@ -3,7 +3,6 @@ import { pluck } from "@vsh/sakura"
 
 const protect = branch()
   .with(async (seed) => {
-    console.log(seed.cookies)
     const token = seed.cookies.get()["accessToken"]
 
     if (!token) {

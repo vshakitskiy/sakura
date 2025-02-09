@@ -22,6 +22,7 @@ const auth = branch()
     cookies.set({
       name: "accessToken",
       value: accessToken,
+      path: "/auth/session",
     })
     return fall(200, user)
   }, { body: signIn })

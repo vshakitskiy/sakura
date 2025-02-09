@@ -21,6 +21,7 @@ import type {
 } from "./utils.ts"
 import { toSchema } from "./utils.ts"
 
+// @TODO: docs
 export type RoutesTree<SeedFrom, SeedTo, Petals extends PetalAny> = {
   next: Record<string, RoutesTree<SeedFrom, SeedTo, Petals>>
   petals: PartialRecord<M, Petal<SeedFrom, SeedTo, M, Schema<any, any>>>
@@ -35,10 +36,12 @@ const initNode = () => {
   }
 }
 
+// @TODO: docs
 export type Schemas<Body extends Schema> = {
   body?: Body
 }
 
+// @TODO: docs
 export type Match<SeedFrom, SeedTo> = (method: M, path: string) => {
   petal: Petal<SeedFrom, SeedTo, M, Schema<any, any>>
   params: StringRecord
@@ -316,6 +319,7 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
   }
 }
 
+// @TODO: docs
 export type BranchAny = Branch<unknown, unknown, PetalAny>
 
 /** Extracts last `Seed` from the branch. */

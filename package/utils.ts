@@ -43,6 +43,7 @@ export type ExtractSchema<T> = T extends Schema<
   }
   : never
 
+// @TODO: docs
 export const toSchema = <T>(parse: (value: unknown) => T): Schema<T, T> => {
   return {
     parse,

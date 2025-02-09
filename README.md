@@ -1,9 +1,10 @@
-# Sakura 🌸 (WIP)
+# Sakura 🌸 - Blossoming HTTP
 
 ![PREVIEW](./preview.png)
 
 Sakura is a Deno HTTP framework build with zero dependencies and zod validation
-support.
+support, that grows organically, drawing inspiration from the graceful elegance
+of a cherry blossom tree.
 
 ## Installation
 
@@ -33,7 +34,7 @@ const app = branch()
   .get("/ping", () => fall(200, { message: "pong" }))
   .get("/runtime", ({ seed: { runtime } }) => fall(200, { runtime }))
   .with((seed) => {
-    // get `SECRET` header
+    // get cookie for secret
     const { secret } = seed.cookies.get<"secret">()
 
     if (!secret) {
@@ -63,12 +64,45 @@ bloom({
   // Runs if petal is not found
   unknown: () => fall(404, { message: "unknown endpoint" }),
   // Runs if Content-type is application/json
-  unsupported: () => fall(415, { message: "body must be json" })
-  
+  unsupported: () => fall(415, { message: "body must be json" }),
+
   port: 4040,
   // Log on each request
   logger: true,
 })
 ```
 
+## Philosophy
+
+Sakura's architecture reflects a natural progression from a tiny seed to a fully
+blossomed tree mirroring the lifecycle of an HTTP request in a unique and
+intuitive way:
+
+- **Seed (Context):**\
+  The seed is the starting point, representing the context of your request. The
+  context holds the initial data and methods needed throughout the request
+  lifecycle.
+
+- **Branches (Routers):**\
+  As a tree grows, its branches extend in different directions. In Sakura,
+  routers are the branches that direct requests to various parts of your
+  application.
+
+- **Petals (Handlers):**\
+  The beauty of a sakura tree lies in its petals. In this framework, handlers
+  are akin to petals.
+
+- **Seed Mutations (Express-like Middlewares alternative):**\
+  Instead of traditional middlewares, Sakura uses “seed mutations”. These are
+  functions that transform and update the context (the seed) as the request is
+  processed.
+
+- **Falling Petals (Sending a Response):**\
+  Finally, just as petals fall from a tree at the end of their bloom, the act of
+  sending a response is represented by falling petals.
+
 <!-- TODO: docs -->
+
+## Documentation
+
+> WIP

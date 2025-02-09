@@ -7,6 +7,7 @@ import type { GenSeed } from "./server.ts"
 import type { Method as M, Schema } from "./utils.ts"
 import type { StringRecord } from "./utils.ts"
 
+// @TODO: docs
 export type Options<Method extends M> = Method extends "GET"
   ? Omit<_Options, "body">
   : _Options
@@ -20,7 +21,14 @@ type ClientOptions<SeedFrom> = {
   error?: ErrorHandler<SeedFrom>
 }
 
+type ClientMethod<Body> = Promise<{
+  res: Response;
+  body: Body | null;
+  cookies: Cookies;
+} | null>
+
 const defaultUrl = "http://localhost:8000"
+// @TODO: docs
 export class SakuraClient<SeedFrom, SeedTo> {
   branch: Branch<SeedFrom, SeedTo, PetalAny>
   genSeed: GenSeed<SeedFrom>
@@ -88,19 +96,24 @@ export class SakuraClient<SeedFrom, SeedTo> {
     }
   }
 
-  get = <Body>(path: `/${string}`, options?: Options<"GET">) =>
+  // @TODO: docs
+  public get = <Body>(path: `/${string}`, options?: Options<"GET">): ClientMethod<Body> =>
     this.method<"GET", Body>("GET", path, options)
 
-  post = <Body>(path: `/${string}`, options?: Options<"POST">) =>
+  // @TODO: docs
+  public post = <Body>(path: `/${string}`, options?: Options<"POST">): ClientMethod<Body> =>
     this.method<"POST", Body>("POST", path, options)
 
-  put = <Body>(path: `/${string}`, options?: Options<"PUT">) =>
+  // @TODO: docs
+  public put = <Body>(path: `/${string}`, options?: Options<"PUT">): ClientMethod<Body> =>
     this.method<"PUT", Body>("PUT", path, options)
 
-  patch = <Body>(path: `/${string}`, options?: Options<"PATCH">) =>
+  // @TODO: docs
+  public patch = <Body>(path: `/${string}`, options?: Options<"PATCH">): ClientMethod<Body> =>
     this.method<"PATCH", Body>("PATCH", path, options)
 
-  delete = <Body>(path: `/${string}`, options?: Options<"DELETE">) =>
+  // @TODO: docs
+  public delete = <Body>(path: `/${string}`, options?: Options<"DELETE">): ClientMethod<Body> =>
     this.method<"DELETE", Body>("DELETE", path, options)
 
   private before = async <Method extends M>(
