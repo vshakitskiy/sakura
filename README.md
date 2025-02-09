@@ -2,6 +2,9 @@
 
 ![PREVIEW](./preview.png)
 
+[![JSR](https://jsr.io/badges/@vsh/sakura)](https://jsr.io/@vsh/sakura)
+[![JSR Score](https://jsr.io/badges/@vsh/sakura/score)](https://jsr.io/@vsh/sakura)
+
 Sakura is a Deno HTTP framework build with zero dependencies and zod validation
 support, that grows organically, drawing inspiration from the graceful elegance
 of a cherry blossom tree.
