@@ -21,11 +21,13 @@ type ClientOptions<SeedFrom> = {
   error?: ErrorHandler<SeedFrom>
 }
 
-type ClientMethod<Body> = Promise<{
-  res: Response;
-  body: Body | null;
-  cookies: Cookies;
-} | null>
+type ClientMethod<Body> = Promise<
+  {
+    res: Response
+    body: Body | null
+    cookies: Cookies
+  } | null
+>
 
 const defaultUrl = "http://localhost:8000"
 // @TODO: docs
@@ -97,24 +99,34 @@ export class SakuraClient<SeedFrom, SeedTo> {
   }
 
   // @TODO: docs
-  public get = <Body>(path: `/${string}`, options?: Options<"GET">): ClientMethod<Body> =>
-    this.method<"GET", Body>("GET", path, options)
+  public get = <Body>(
+    path: `/${string}`,
+    options?: Options<"GET">,
+  ): ClientMethod<Body> => this.method<"GET", Body>("GET", path, options)
 
   // @TODO: docs
-  public post = <Body>(path: `/${string}`, options?: Options<"POST">): ClientMethod<Body> =>
-    this.method<"POST", Body>("POST", path, options)
+  public post = <Body>(
+    path: `/${string}`,
+    options?: Options<"POST">,
+  ): ClientMethod<Body> => this.method<"POST", Body>("POST", path, options)
 
   // @TODO: docs
-  public put = <Body>(path: `/${string}`, options?: Options<"PUT">): ClientMethod<Body> =>
-    this.method<"PUT", Body>("PUT", path, options)
+  public put = <Body>(
+    path: `/${string}`,
+    options?: Options<"PUT">,
+  ): ClientMethod<Body> => this.method<"PUT", Body>("PUT", path, options)
 
   // @TODO: docs
-  public patch = <Body>(path: `/${string}`, options?: Options<"PATCH">): ClientMethod<Body> =>
-    this.method<"PATCH", Body>("PATCH", path, options)
+  public patch = <Body>(
+    path: `/${string}`,
+    options?: Options<"PATCH">,
+  ): ClientMethod<Body> => this.method<"PATCH", Body>("PATCH", path, options)
 
   // @TODO: docs
-  public delete = <Body>(path: `/${string}`, options?: Options<"DELETE">): ClientMethod<Body> =>
-    this.method<"DELETE", Body>("DELETE", path, options)
+  public delete = <Body>(
+    path: `/${string}`,
+    options?: Options<"DELETE">,
+  ): ClientMethod<Body> => this.method<"DELETE", Body>("DELETE", path, options)
 
   private before = async <Method extends M>(
     path: `/${string}`,
