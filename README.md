@@ -104,8 +104,67 @@ intuitive way:
   Just as petals fall from a tree at the end of their bloom, the act of sending
   a response is represented by falling petals.
 
-<!-- TODO: docs -->
-
 ## Documentation
 
-> WIP
+### Initializing framework utilities
+
+The first step of using Sakura is to initialize the core utilities using `sakura()` function. It takes a seed generator and creates an initial context generator (`seed`) and `branch()` function for creating new branches with the initial context provided.
+
+```ts
+import { sakura } from "@vsh/sakura"
+
+// Record when the server started (used to calculate uptime)
+const startTime = Date.now()
+
+// Initialize Sakura with a seed generator function
+const { seed, branch } = sakura((req, cookies) => ({
+  req,     // The original HTTP Request object
+  cookies, // Instance for handling cookies
+
+  runtime: Date.now() - startTime, // Calculated runtime
+}));
+
+// Now `seed` holds our request context generator,
+// and `branch` is our entry point for routing.
+```
+
+### Defining routes
+
+Sakura uses branches for routing. A branch is created using the `branch()` function, provided by the `sakura()` initializer. It allows you to register routes for different HTTP methods. Each route is defined with a path, a handler function.
+
+```ts
+import { fall } from "@vsh/sakura"
+
+// Define simple endpoints
+const app = branch()
+  .get("/ping", () => fall(200, { message: "pong" }))
+  .get("/runtime", ({ seed: { runtime } }) => fall(200, { runtime }));
+```
+
+**Using Zod schemas to validate requests**
+
+When defining routes, you can pass Zod schemas as an optional third parameter. Body validation will only work for methods like `POST`, `PUT`, `PATCH` AND `DELETE`.
+
+```ts
+import { z } from "npm:zod"
+import { fall } from "@vsh/sakura"
+
+// Define a schema for a user object
+const userSchema = z.object({
+  name: z.string(),
+  age: z.number(),
+})
+
+// Create a POST endpoint that validates the request body against the schema
+const app = branch()
+  .post(
+    "/user",
+    ({ seed, body }) => {
+      // Here, "body" has already been validated and parsed by Zod
+      return fall(200, { data: body })
+    },
+    { body: userSchema } // The third parameter: Zod schema for validation
+  )
+```
+<!-- TODO: docs -->
+> ...WIP
