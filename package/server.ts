@@ -138,10 +138,17 @@ export const bloom = <InitSeed, CurrSeed>({
             : fall(404, { message: "not found" })
         }
 
-        const { petal, params } = match
+        const { petal, params: rawParams } = match
         const seed = await petal.mutation(initSeed)
+        let params = rawParams
+        if (petal.params) {
+          params = await petal.params.parse(params)
+        }
 
-        const query = getQuery(url)
+        let query = getQuery(url)
+        if (petal.query) {
+          query = await petal.query.parse(query)
+        }
 
         let body = undefined
         if (method !== "GET") {

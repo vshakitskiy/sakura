@@ -19,7 +19,17 @@ import type { Method as M, SeedMutation } from "./utils.ts"
 /** Finalized version of petal storaging used for faster pattern search. */
 export type RoutesTree<SeedFrom, SeedTo, Petals extends PetalAny> = {
   next: Record<string, RoutesTree<SeedFrom, SeedTo, Petals>>
-  petals: PartialRecord<M, Petal<SeedFrom, SeedTo, M, Schema<any, any>>>
+  petals: PartialRecord<
+    M,
+    Petal<
+      SeedFrom,
+      SeedTo,
+      M,
+      Schema<any, any>,
+      Schema<any, any>,
+      Schema<any, any>
+    >
+  >
   params: PartialRecord<M, string>
 }
 
@@ -32,27 +42,42 @@ const initNode = () => {
 }
 
 /** Contains Zod schemas to parse request metadata to required type. Ignore if you are not planning to use Zod. */
-export type Schemas<Body extends Schema> = {
+export type Schemas<
+  Body extends Schema,
+  Params extends Schema,
+  Query extends Schema,
+> = {
   body?: Body
+  params?: Params
+  query?: Query
 }
 
 /** Function that returns petal and compiled parameters based on the method and path provided. */
 export type Match<SeedFrom, SeedTo> = (method: M, path: string) => {
-  petal: Petal<SeedFrom, SeedTo, M, Schema<any, any>>
+  petal: Petal<
+    SeedFrom,
+    SeedTo,
+    M,
+    Schema<any, any>,
+    Schema<any, any>,
+    Schema<any, any>
+  >
   params: StringRecord
 } | null
 
 type OnMethod<Method extends M, SeedFrom, SeedTo, Petals extends PetalAny> = <
   Body extends Schema = never,
+  Params extends Schema = never,
+  Query extends Schema = never,
 >(
   path: string,
-  handler: Handler<SeedTo, Method, Body>,
-  schemas?: Method extends "GET" ? Omit<Schemas<Body>, "body">
-    : Schemas<Body>,
+  handler: Handler<SeedTo, Method, Body, Params, Query>,
+  schemas?: Method extends "GET" ? Omit<Schemas<Body, Params, Query>, "body">
+    : Schemas<Body, Params, Query>,
 ) => Branch<
   SeedFrom,
   SeedTo,
-  Petals | Petal<SeedFrom, SeedTo, M, Body>
+  Petals | Petal<SeedFrom, SeedTo, M, Body, Params, Query>
 >
 
 /**
@@ -293,11 +318,16 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
     return null
   }
 
-  private _append = <Method extends M, Body extends Schema = never>(
+  private _append = <
+    Method extends M,
+    Body extends Schema = never,
+    Params extends Schema = never,
+    Query extends Schema = never,
+  >(
     method: Method,
     path: string,
     handler: Handler<SeedTo, Method, Body>,
-    schemas?: Schemas<Body>,
+    schemas?: Schemas<Body, Params, Query>,
   ) => {
     const petal = {
       mutation: this.mutation,
@@ -305,7 +335,11 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       path,
       handler,
       body: schemas?.body?.parse ? toSchema(schemas.body.parse) : undefined,
-    } as Petal<SeedFrom, SeedTo, M, Body>
+      params: schemas?.params?.parse
+        ? toSchema(schemas.params.parse)
+        : undefined,
+      query: schemas?.query?.parse ? toSchema(schemas.query.parse) : undefined,
+    } as Petal<SeedFrom, SeedTo, M, Body, Params, Query>
 
     return new Branch({
       petals: new Set([...this.petals, petal]),

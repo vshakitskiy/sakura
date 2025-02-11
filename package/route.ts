@@ -21,12 +21,18 @@ export type HandlerArgAny<Seed> = HandlerArg<
 export type ArgByMethod<Arg extends HandlerArgAny<unknown>, Method extends M> =
   Method extends "GET" ? Omit<Arg, "body"> : Arg
 
-export type Handler<Seed, Method extends M, Body extends Schema = never> = (
+export type Handler<
+  Seed,
+  Method extends M,
+  Body extends Schema = never,
+  Params extends Schema = never,
+  Query extends Schema = never,
+> = (
   arg: ArgByMethod<
     HandlerArg<
       Seed,
-      StringRecord,
-      StringRecord,
+      [Params] extends [never] ? StringRecord : ExtractSchema<Params>["output"],
+      [Query] extends [never] ? StringRecord : ExtractSchema<Query>["output"],
       [Body] extends [never] ? any : ExtractSchema<Body>["output"]
     >,
     Method
@@ -38,17 +44,23 @@ export type Petal<
   SeedTo,
   Method extends M,
   Body extends Schema,
+  Params extends Schema,
+  Query extends Schema,
 > = {
   mutation: SeedMutation<SeedFrom, SeedTo>
   body?: Body
   method: Method
   path: string
-  handler: Handler<SeedTo, Method, Body>
+  params?: Params
+  query?: Query
+  handler: Handler<SeedTo, Method, Body, Params, Query>
 }
 
 export type PetalAny<SeedFrom = any, SeedTo = any> = Petal<
   SeedFrom,
   SeedTo,
   Method,
+  Schema<any, any>,
+  Schema<any, any>,
   Schema<any, any>
 >
