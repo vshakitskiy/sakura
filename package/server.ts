@@ -26,7 +26,8 @@ import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
 import type { PetalAny } from "./route.ts"
 import { Cookies } from "./cookies.ts"
-import type { BeforeHandler, ErrorHandler, StringRecord } from "./external.ts"
+import { getQuery } from "./external.ts"
+import type { BeforeHandler, ErrorHandler } from "./external.ts"
 
 /**
  * Creates request's inital seed.
@@ -181,14 +182,6 @@ export const bloom = <InitSeed, CurrSeed>({
 
     return resp
   })
-}
-
-const getQuery = (url: URL) => {
-  const query: StringRecord = {}
-  for (const [key, val] of url.searchParams) {
-    query[key] = val
-  }
-  return query
 }
 
 const getBody = (req: Request) => {

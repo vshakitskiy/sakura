@@ -51,7 +51,6 @@ export class Cookies {
   private parsed: string[]
 
   constructor(req: Request) {
-    console.log(req.headers)
     this.reqCookies = getCookies(req.headers)
     this.setCookies = []
     this.parsed = []
@@ -111,7 +110,7 @@ export class Cookies {
   /**
    * Deletes cookie using `Set-Cookie` header.
    */
-  public deleteCookie = (
+  public delete = (
     name: string,
     attributes?: Pick<
       Cookie,

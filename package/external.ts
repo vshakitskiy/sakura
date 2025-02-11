@@ -37,3 +37,11 @@ export type RecordRaw = {
 }
 
 export type StringRecord = Record<string, string>
+
+export const getQuery = (url: URL) => {
+  const query: StringRecord = {}
+  for (const [key, val] of url.searchParams) {
+    query[key] = val
+  }
+  return query
+}

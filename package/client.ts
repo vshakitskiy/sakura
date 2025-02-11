@@ -4,9 +4,10 @@
  */
 
 import { Cookies } from "./cookies.ts"
-import type { ErrorHandler, Schema, StringRecord } from "./external.ts"
+import { getQuery } from "./external.ts"
+import type { BeforeHandler, ErrorHandler } from "./external.ts"
 import { fall, SakuraError } from "./res.ts"
-import type { Handler, HandlerArgAny, PetalAny } from "./route.ts"
+import type { PetalAny } from "./route.ts"
 import type { Branch, Match } from "./router.ts"
 import type { GenSeed } from "./server.ts"
 import type { Method as M } from "./utils.ts"
@@ -21,6 +22,7 @@ type _Options = {
 
 type ClientOptions<SeedFrom> = {
   error?: ErrorHandler<SeedFrom>
+  unknown?: BeforeHandler<SeedFrom>
 }
 
 type ClientMethod<Body> = Promise<
@@ -28,7 +30,7 @@ type ClientMethod<Body> = Promise<
     res: Response
     body: Body | null
     cookies: Cookies
-  } | null
+  }
 >
 
 const defaultUrl = "http://localhost:8000"
@@ -72,159 +74,124 @@ export class SakuraClient<SeedFrom, SeedTo> {
     path: `/${string}`,
     options?: Options<Method>,
   ) => {
-    const meta = await this.before(path, method, options)
+    const url = new URL(`${defaultUrl}${path}`)
+    const req = genRequest(url, method, options)
+    const cookies = new Cookies(req)
 
-    try {
-      const match = await this.request(
-        meta,
-        options,
-      )
-      if (!match) return null
+    const res = await (async () => {
+      const initSeed = await this.genSeed(req, cookies)
 
-      const res = await (async () => {
-        try {
-          const res = await match.handler(match.arg)
-          return this.after(res, match.arg.cookies)
-        } catch (err: unknown) {
-          if (err instanceof SakuraError) {
-            return fall(err.status, err.body, err.headers)
-          }
-
-          if (this.options.error) {
-            try {
-              return await this.options.error({
-                error: err,
-                seed: meta.initSeed,
-              })
-            } catch (_) {
-              return fall(500)
-            }
-          }
-          return fall(500)
+      try {
+        const match = this.match(method, url.pathname)
+        if (!match) {
+          return this.options.unknown
+            ? this.options.unknown({
+              req,
+              seed: initSeed,
+            })
+            : fall(404, { message: "not found" })
         }
-      })()
 
-      const body = res.body ? await res.json() as Body : null
+        const { petal, params } = match
+        const seed = await petal.mutation(initSeed)
+        const query = getQuery(url)
+        let body = undefined
+        if (method !== "GET") {
+          body = (options as _Options)?.body
+          if (petal.body && body) body = petal.body.parse(body)
+        }
 
-      return {
-        res,
-        body,
-        cookies: match.arg.cookies,
+        return await petal.handler({
+          seed,
+          req,
+          params,
+          query,
+          body,
+          cookies,
+        })
+      } catch (err) {
+        if (err instanceof SakuraError) {
+          return fall(err.status, err.body, err.headers)
+        } else if (this.options.error) {
+          try {
+            return this.options.error({ error: err, seed: initSeed })
+          } catch (_) {
+            return fall(500, { message: "internal server error" })
+          }
+        } else return fall(500, { message: "internal server error" })
       }
-    } catch (error) {
-      console.log(error)
-      return null
+    })()
+
+    const body = res.body ? await res.json() as Body : null
+
+    for (const cookie of cookies.parse()) {
+      res.headers.append("set-cookie", cookie)
+    }
+
+    return {
+      res,
+      body,
+      cookies,
     }
   }
 
-  // @TODO: docs
+  /**
+   * Corresponds to the GET http method.
+   */
   public get = <Body>(
     path: `/${string}`,
     options?: Options<"GET">,
   ): ClientMethod<Body> => this.method<"GET", Body>("GET", path, options)
 
-  // @TODO: docs
+  /**
+   * Corresponds to the GET http method.
+   */
   public post = <Body>(
     path: `/${string}`,
     options?: Options<"POST">,
   ): ClientMethod<Body> => this.method<"POST", Body>("POST", path, options)
 
-  // @TODO: docs
+  /**
+   * Corresponds to the GET http method.
+   */
   public put = <Body>(
     path: `/${string}`,
     options?: Options<"PUT">,
   ): ClientMethod<Body> => this.method<"PUT", Body>("PUT", path, options)
 
-  // @TODO: docs
+  /**
+   * Corresponds to the GET http method.
+   */
   public patch = <Body>(
     path: `/${string}`,
     options?: Options<"PATCH">,
   ): ClientMethod<Body> => this.method<"PATCH", Body>("PATCH", path, options)
 
-  // @TODO: docs
+  /**
+   * Corresponds to the GET http method.
+   */
   public delete = <Body>(
     path: `/${string}`,
     options?: Options<"DELETE">,
   ): ClientMethod<Body> => this.method<"DELETE", Body>("DELETE", path, options)
-
-  private before = async <Method extends M>(
-    path: `/${string}`,
-    method: Method,
-    options?: Options<Method>,
-  ) => {
-    const url = new URL(`${defaultUrl}${path} `)
-    const req = new Request(url.toString(), {
-      method,
-    })
-
-    if (options?.cookies) {
-      const cookies = Object.entries(options.cookies)
-        .map((entry) => entry.join("="))
-        .join("; ")
-
-      req.headers.set("Cookie", cookies)
-    }
-
-    const cookies = new Cookies(req)
-    const initSeed = await this.genSeed(req, cookies)
-    return {
-      url,
-      req,
-      initSeed,
-      cookies,
-      method,
-    }
-  }
-
-  private request = async <Method extends M>(
-    { url, method, initSeed, cookies, req }: {
-      url: URL
-      req: Request
-      initSeed: SeedFrom
-      cookies: Cookies
-      method: Method
-    },
-    options?: _Options,
-  ): Promise<
-    {
-      handler: Handler<SeedTo, Method, Schema<any, any>>
-      arg: HandlerArgAny<SeedTo>
-    } | null
-  > => {
-    const match = this.match(method, url.pathname)
-
-    if (!match) return null
-    const { params, petal } = match
-
-    const query = getQuery(url)
-
-    const seed = await petal.mutation(initSeed)
-
-    return {
-      handler: petal.handler,
-      arg: {
-        req,
-        cookies,
-        seed,
-        query,
-        params,
-        body: options?.body,
-      },
-    }
-  }
-
-  private after = (res: Response, cookies: Cookies) => {
-    for (const cookie of cookies.parse()) {
-      res.headers.append("set-cookie", cookie)
-    }
-    return res
-  }
 }
 
-const getQuery = (url: URL) => {
-  const query: StringRecord = {}
-  for (const [key, val] of url.searchParams) {
-    query[key] = val
+const genRequest = <Method extends M>(
+  url: URL,
+  method: Method,
+  options?: Options<Method>,
+) => {
+  const req = new Request(url.toString(), {
+    method,
+  })
+
+  if (options?.cookies) {
+    const cookies = Object.entries(options.cookies)
+      .map((entry) => entry.join("="))
+      .join("; ")
+
+    req.headers.set("Cookie", cookies)
   }
-  return query
+
+  return req
 }
