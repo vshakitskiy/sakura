@@ -75,7 +75,7 @@ bloom({
 })
 ```
 
-## Philosophy
+## About
 
 Sakura's architecture reflects a natural progression from a tiny seed to a fully
 blossomed tree mirroring the lifecycle of an HTTP request in a unique and
@@ -106,7 +106,7 @@ intuitive way:
 
 ## Documentation
 
-### Initializing framework utilities
+### Initializing Framework Utilities
 
 The first step of using Sakura is to initialize the core utilities using `sakura()` function. It takes a seed generator and creates an initial context generator (`seed`) and `branch()` function for creating new branches with the initial context provided.
 
@@ -128,7 +128,7 @@ const { seed, branch } = sakura((req, cookies) => ({
 // and `branch` is our entry point for routing.
 ```
 
-### Defining routes
+### Defining Routes
 
 Sakura uses branches for routing. A branch is created using the `branch()` function, provided by the `sakura()` initializer. It allows you to register routes for different HTTP methods. Each route is defined with a path, a handler function.
 
@@ -141,9 +141,9 @@ const app = branch()
   .get("/runtime", ({ seed: { runtime } }) => fall(200, { runtime }));
 ```
 
-**Using Zod schemas to validate requests**
+**Zod schemas to validate requests**
 
-When defining routes, you can pass Zod schemas as an optional third parameter. Body validation will only work for methods like `POST`, `PUT`, `PATCH` AND `DELETE`.
+When defining routes, you can pass Zod schemas as an optional third parameter. These schemas will be used to validate and parse the request body, parameters and queries. Body validation will only work for methods like `POST`, `PUT`, `PATCH` AND `DELETE`.
 
 ```ts
 import { z } from "npm:zod"
@@ -166,5 +166,116 @@ const app = branch()
     { body: userSchema } // The third parameter: Zod schema for validation
   )
 ```
-<!-- TODO: docs -->
-> ...WIP
+
+### Using Mutations
+
+Instead of traditional middleware, Sakura uses "Seed Mutation". Mutations let you transform the seed before it reaches your endpoint handler. This is useful for tasks such authentacation or adding extra information to a context. With `.with()` method transforms the request's seed.
+
+```ts
+import { fall, pluck } from "@vsh/sakura"
+
+const app = branch()
+  .with((seed) => {
+    // Retrieve a secret from cookies
+    const { secret } = seed.cookies.get<"secret">()
+    
+    // If the secret is not provided, terminate the request early
+    if (!secret) {
+      throw pluck(400, { message: "Secret is not provided." })
+    }
+  
+    // Otherwise, add the secret to the seed and continue processing
+    return { ...seed, secret }
+  })
+  // Define a secured endpoint that requires the secret cookie
+  .get("/secret", ({ seed: { secret } }) => fall(200, { secret }))
+```
+
+### Sending a Response
+
+Sakura provides helper functions to send responses:
+- **fall(status, json, headers):**\
+Constructs and returns a JSON response. It automatically sets the `Content-Type` header as `application/json`.
+- **pluck(status, json, headers):**\
+Constructs and returs a custom `SakuraError`, which is useful in mutations when you need to abort processing and send an error response.
+
+```ts
+import { fall, pluck } from "@vsh/sakura"
+
+// Simple endpoint returning a JSON response
+app.get("/ping", () => fall(200, { message: "pong" }))
+
+// Using pluck in a mutation for error handling
+app.with((seed) => {
+  if (!seed.user) {
+    throw pluck(401, { message: "Unauthorized" })
+  }
+  return seed
+})
+```
+
+### Starting a Server
+
+Once you've defined your routes, mutations, and response handlers, the final step is to start the server using the `bloom()` function. This function ties everything and starts the Deno HTTP server.
+
+```ts
+import { bloom } from "@vsh/sakura"
+
+// Start the server with a custom configuration
+bloom({
+  seed,        // Seed generator from our initialization
+  branch: app, // Our routing branch (could be `app` or `securedApp`)
+  port: 4040,  // Port number where the server listens
+  error: ({ error, seed }) =>
+    // Global error handler for unexpected errors
+    fall(500, { message: "Internal server error" }),
+  unknown: ({ req, seed }) =>
+    // Handler for unknown endpoints
+    fall(404, { message: "Endpoint not found" }),
+  unsupported: ({ req, seed }) =>
+    // Handler for unsupported content types
+    fall(415, { message: "Unsupported Media Type" }),
+  logger: true, // Enable logging for each request
+});
+```
+
+### Cookies
+
+Sakura integrates cookie management through its dedicated `Cookies` utility. When a request comes in, a `Cookies` instance is created from the request headers and passed along in your handler. Tis lets you easily read, set and delete cookies as part of your handler logic.
+
+```ts
+branch()
+  .get("/check", ({ cookies }) => {
+    // Retrieve the "session" cookie (with type hinting)
+    const session = cookies.get<"session">()
+    return fall(200, { session })
+  })
+  .get("/visit", ({ cookies }) => {
+    // Set a new cookie called "visited" with a max age of 1 hour
+    cookies.set({ name: "visited", value: "true", maxAge: 3600 })
+    return fall(204)
+  })
+  .get("/logout", ({ cookies }) => {
+    // Delete the "session" cookie
+    cookies.deleteCookie("session", { path: "/" })
+    return fall(200, { message: "Logged out" })
+  })
+```
+
+### Testing
+
+Sakura provides an HTTP client - `SakuraClient`. It allows you to simulate HTTP requests with your application. This is especially useful for testing your routes or integrating a client-side library without needing an external HTTP client.
+
+The client is initialized with your application branch and the seed generator. Once created, you can use methods to send requests.
+
+```ts
+import { SakuraClient } from "@vsh/sakura/client"
+
+const client = new SakuraClient(app, seed)
+
+const ping = await client.get("/ping")
+console.log(ping!.body) // { message: "pong" }
+
+const user = await client.post("/user", { body: { name: "Alice", age: 30 } })
+console.log(user!.body) // Contains the validated user data or an error message
+```
