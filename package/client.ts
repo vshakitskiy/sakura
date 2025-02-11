@@ -1,15 +1,17 @@
+/**
+ * Contains a client utility.
+ * @module
+ */
+
 import { Cookies } from "./cookies.ts"
-import type { ErrorHandler } from "./external.ts"
+import type { ErrorHandler, Schema, StringRecord } from "./external.ts"
 import { fall, SakuraError } from "./res.ts"
 import type { Handler, HandlerArgAny, PetalAny } from "./route.ts"
 import type { Branch, Match } from "./router.ts"
 import type { GenSeed } from "./server.ts"
-import type { Method as M, Schema } from "./utils.ts"
-import type { StringRecord } from "./utils.ts"
+import type { Method as M } from "./utils.ts"
 
-// @TODO: docs
-export type Options<Method extends M> = Method extends "GET"
-  ? Omit<_Options, "body">
+type Options<Method extends M> = Method extends "GET" ? Omit<_Options, "body">
   : _Options
 
 type _Options = {
@@ -30,7 +32,24 @@ type ClientMethod<Body> = Promise<
 >
 
 const defaultUrl = "http://localhost:8000"
-// @TODO: docs
+
+/**
+ * Initialize client with branch, seed and options provided.
+ *
+ * @example
+ * ```ts
+ * const { branch, seed } = sakura((req, cookies) => ({
+ *   req, cookies
+ * }))
+ *
+ * const app = branch()
+ *   .get("/ping", () => fall(200, "pong"))
+ *
+ * const client = new SakuraClient(app, seed)
+ * const res = await client.get("/ping")
+ * // ...
+ * ```
+ */
 export class SakuraClient<SeedFrom, SeedTo> {
   branch: Branch<SeedFrom, SeedTo, PetalAny>
   genSeed: GenSeed<SeedFrom>
@@ -133,7 +152,7 @@ export class SakuraClient<SeedFrom, SeedTo> {
     method: Method,
     options?: Options<Method>,
   ) => {
-    const url = new URL(`${defaultUrl}${path}`)
+    const url = new URL(`${defaultUrl}${path} `)
     const req = new Request(url.toString(), {
       method,
     })

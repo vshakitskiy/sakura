@@ -1,5 +1,5 @@
 /**
- * Contains functions/classes related to working with routers.
+ * Contains utilities for routing.
  *
  * @example
  * ```ts
@@ -11,17 +11,12 @@
  * ```
  * @module
  */
+import { toSchema } from "./external.ts"
+import type { PartialRecord, Schema, StringRecord } from "./external.ts"
 import type { Handler, Petal, PetalAny } from "./route.ts"
-import type {
-  Method as M,
-  PartialRecord,
-  Schema,
-  SeedMutation,
-  StringRecord,
-} from "./utils.ts"
-import { toSchema } from "./utils.ts"
+import type { Method as M, SeedMutation } from "./utils.ts"
 
-// @TODO: docs
+/** Finalized version of petal storaging used for faster pattern search. */
 export type RoutesTree<SeedFrom, SeedTo, Petals extends PetalAny> = {
   next: Record<string, RoutesTree<SeedFrom, SeedTo, Petals>>
   petals: PartialRecord<M, Petal<SeedFrom, SeedTo, M, Schema<any, any>>>
@@ -36,12 +31,12 @@ const initNode = () => {
   }
 }
 
-// @TODO: docs
+/** Contains Zod schemas to parse request metadata to required type. Ignore if you are not planning to use Zod. */
 export type Schemas<Body extends Schema> = {
   body?: Body
 }
 
-// @TODO: docs
+/** Function that returns petal and compiled parameters based on the method and path provided. */
 export type Match<SeedFrom, SeedTo> = (method: M, path: string) => {
   petal: Petal<SeedFrom, SeedTo, M, Schema<any, any>>
   params: StringRecord
@@ -319,9 +314,5 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
   }
 }
 
-// @TODO: docs
+/** Branch type with unknown seed. */
 export type BranchAny = Branch<unknown, unknown, PetalAny>
-
-/** Extracts last `Seed` from the branch. */
-export type ExtractSeed<T> = T extends Branch<any, infer Seed, PetalAny> ? Seed
-  : never

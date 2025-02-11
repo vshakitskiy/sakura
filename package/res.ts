@@ -1,5 +1,5 @@
 /**
- * Contains functions/classes related to sending response.
+ * Contains uiilities for sending responses.
  *
  * @example
  * ```ts

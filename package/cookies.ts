@@ -1,3 +1,8 @@
+/**
+ * Contains utilities for using cookies.
+ * @module
+ */
+
 // Source: https://jsr.io/@std/http/1.0.12/cookie.ts
 
 /** Cookie metadata: name, value and different attributes. */

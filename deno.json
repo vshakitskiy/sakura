@@ -1,14 +1,14 @@
 {
   "name": "@vsh/sakura",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "exports": {
     ".": "./package/mod.ts",
     "./res": "./package/res.ts",
     "./cookies": "./package/cookies.ts",
     "./router": "./package/router.ts",
     "./server": "./package/server.ts",
-    "./route": "./package/route.ts",
-    "./client": "./package/client.ts"
+    "./client": "./package/client.ts",
+    "./utils": "./package/utils.ts"
   },
   "publish": {
     "exclude": [

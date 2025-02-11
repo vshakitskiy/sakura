@@ -1,5 +1,5 @@
 /**
- * Contains functions/classes related to creating and starting server.
+ * Contains utilities for creating and starting server.
  *
  * @example
  * ```ts
@@ -21,12 +21,12 @@
  */
 
 import { Branch } from "./router.ts"
-import type { Method, Return, StringRecord } from "./utils.ts"
+import type { Method, Return } from "./utils.ts"
 import { SakuraError } from "./res.ts"
 import { fall } from "./res.ts"
 import type { PetalAny } from "./route.ts"
 import { Cookies } from "./cookies.ts"
-import type { BeforeHandler, ErrorHandler } from "./external.ts"
+import type { BeforeHandler, ErrorHandler, StringRecord } from "./external.ts"
 
 /**
  * Creates request's inital seed.
