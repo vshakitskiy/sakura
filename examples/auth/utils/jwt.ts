@@ -23,18 +23,22 @@ export const sign = <T extends Record<string, any>>(
   data: T,
   exp: number = day * 3,
 ) =>
-  create({
-    alg: "HS512",
-    typ: "JWT",
-  }, {
-    ...data,
-    exp: getNumericDate(exp),
-  }, key)
+  create(
+    {
+      alg: "HS512",
+      typ: "JWT",
+    },
+    {
+      ...data,
+      exp: getNumericDate(exp),
+    },
+    key,
+  )
 
 // deno-lint-ignore no-explicit-any
 export const extract = async <T extends Record<string, any>>(jwt: string) => {
   try {
-    return await verify(jwt, key) as T & { exp: number }
+    return (await verify(jwt, key)) as T & { exp: number }
   } catch {
     throw new MessageError("AccessToken is invalid.")
   }

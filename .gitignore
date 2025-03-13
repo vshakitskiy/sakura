@@ -1,2 +1,3 @@
-.ignore.ts
 .rest
+.dev
+node_modules

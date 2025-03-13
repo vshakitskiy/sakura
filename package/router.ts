@@ -53,7 +53,10 @@ export type Schemas<
 }
 
 /** Function that returns petal and compiled parameters based on the method and path provided. */
-export type Match<SeedFrom, SeedTo> = (method: M, path: string) => {
+export type Match<SeedFrom, SeedTo> = (
+  method: M,
+  path: string,
+) => {
   petal: Petal<
     SeedFrom,
     SeedTo,
@@ -72,7 +75,8 @@ type OnMethod<Method extends M, SeedFrom, SeedTo, Petals extends PetalAny> = <
 >(
   path: string,
   handler: Handler<SeedTo, Method, Body, Params, Query>,
-  schemas?: Method extends "GET" ? Omit<Schemas<Body, Params, Query>, "body">
+  schemas?: Method extends "GET"
+    ? Omit<Schemas<Body, Params, Query>, "body">
     : Schemas<Body, Params, Query>,
 ) => Branch<
   SeedFrom,
@@ -142,14 +146,12 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
       mutation: async (seed) => mutation(await this.mutation(seed)),
     })
 
-  private method = <Method extends M>(
-    method: Method,
-  ): OnMethod<Method, SeedFrom, SeedTo, Petals> =>
-  (
-    path,
-    handler,
-    schemas?,
-  ) => this._append(method, path, handler, schemas)
+  private method =
+    <Method extends M>(
+      method: Method,
+    ): OnMethod<Method, SeedFrom, SeedTo, Petals> =>
+    (path, handler, schemas?) =>
+      this._append(method, path, handler, schemas)
 
   /**
    * Corresponds to the GET http method.
@@ -169,16 +171,14 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
   /**
    * Corresponds to the PATCH http method.
    */
-  public patch: OnMethod<"PATCH", SeedFrom, SeedTo, Petals> = this.method(
-    "PATCH",
-  )
+  public patch: OnMethod<"PATCH", SeedFrom, SeedTo, Petals> =
+    this.method("PATCH")
 
   /**
    * Corresponds to the DELETE http method.
    */
-  public delete: OnMethod<"DELETE", SeedFrom, SeedTo, Petals> = this.method(
-    "DELETE",
-  )
+  public delete: OnMethod<"DELETE", SeedFrom, SeedTo, Petals> =
+    this.method("DELETE")
 
   /**
    * Merges one branch into another by prefix. Mutations of each other are not affected.
@@ -271,9 +271,9 @@ export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
 
     return node.petals[method]
       ? {
-        petal: node.petals[method],
-        params,
-      }
+          petal: node.petals[method],
+          params,
+        }
       : null
   }
 

@@ -1,27 +1,26 @@
 {
   "name": "@vsh/sakura",
   "version": "0.5.2",
+  "nodeModulesDir": "auto",
   "exports": {
     ".": "./package/mod.ts",
-    "./res": "./package/res.ts",
     "./cookies": "./package/cookies.ts",
-    "./router": "./package/router.ts",
-    "./server": "./package/server.ts",
-    "./client": "./package/client.ts",
-    "./utils": "./package/utils.ts"
+    "./client": "./package/client.ts"
   },
   "publish": {
     "exclude": [
       "./tests",
       "./examples",
-      ".rest",
       ".ignore.ts",
       "preview.png",
-      ".github"
+      ".github",
+      ".gitignore",
+      "eslint.config.js"
     ]
   },
   "tasks": {
     "format": "deno fmt --check",
+    "lint": "deno run -A npm:eslint",
     "test": "deno test --allow-net",
     "dry-run": "deno publish --dry-run"
   },
@@ -34,7 +33,13 @@
     }
   },
   "imports": {
+    "@eslint/js": "npm:@eslint/js@^9.22.0",
     "@std/assert": "jsr:@std/assert@^1.0.9",
+    "@typescript-eslint/eslint-plugin": "npm:@typescript-eslint/eslint-plugin@^8.26.1",
+    "eslint-plugin-import": "npm:eslint-plugin-import@^2.31.0",
+    "eslint-plugin-prettier": "npm:eslint-plugin-prettier@^5.2.3",
+    "globals": "npm:globals@^16.0.0",
+    "typescript-eslint": "npm:typescript-eslint@^8.26.1",
     "zod": "npm:zod@^3.24.1"
   }
 }

@@ -29,9 +29,13 @@ const app = branch()
     // deno-lint-ignore no-unreachable
     return fall(200)
   })
-  .post("/zod", ({ body }) => {
-    return fall(200, body)
-  }, { body })
+  .post(
+    "/zod",
+    ({ body }) => {
+      return fall(200, body)
+    },
+    { body },
+  )
 
 const client = new SakuraClient(app, seed, {
   error: ({ error }) => {
@@ -76,10 +80,12 @@ Deno.test("Ensure cookies", async () => {
 
   is(res.body, cookies)
   is(res.res.headers.getSetCookie(), ["runtime=deno"])
-  is(res.cookies.getSet(), [{
-    name: "runtime",
-    value: "deno",
-  }])
+  is(res.cookies.getSet(), [
+    {
+      name: "runtime",
+      value: "deno",
+    },
+  ])
   is(res.cookies.get(), { v: "0" })
 })
 

@@ -29,11 +29,7 @@ export class SakuraError extends Error {
   public readonly body: any
   public readonly status: number
   public readonly headers?: HeadersInit
-  constructor(
-    status: number,
-    json?: any,
-    headers?: HeadersInit,
-  ) {
+  constructor(status: number, json?: any, headers?: HeadersInit) {
     super("Sakura Response")
     this.status = status
     this.body = json

@@ -1,6 +1,6 @@
 import type { Cookies } from "./cookies.ts"
 import type { ExtractSchema, Schema, StringRecord } from "./external.ts"
-import type { Method, Method as M, Return, SeedMutation } from "./utils.ts"
+import type { Method as M, Method, Return, SeedMutation } from "./utils.ts"
 
 export type HandlerArg<Seed, Params, Query, Body> = {
   req: Request
@@ -18,8 +18,10 @@ export type HandlerArgAny<Seed> = HandlerArg<
   any
 >
 
-export type ArgByMethod<Arg extends HandlerArgAny<unknown>, Method extends M> =
-  Method extends "GET" ? Omit<Arg, "body"> : Arg
+export type ArgByMethod<
+  Arg extends HandlerArgAny<unknown>,
+  Method extends M,
+> = Method extends "GET" ? Omit<Arg, "body"> : Arg
 
 export type Handler<
   Seed,

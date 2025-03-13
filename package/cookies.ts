@@ -127,6 +127,59 @@ export class Cookies {
 
   /** Returns cookies from `set()` method parsed as a string. */
   public parse = () => this.parsed
+
+  /**
+   * Extracts cookies from the response's `Set-Cookie` header.
+   */
+  public fromResponse(res: Response): void {
+    const setCookieHeaders = res.headers.get("Set-Cookie")
+    if (!setCookieHeaders) {
+      return
+    }
+
+    const cookieStrings = setCookieHeaders.split(", ")
+    for (const cookieString of cookieStrings) {
+      const cookieParts = cookieString.split("; ")
+      const [nameValue] = cookieParts
+      const [name, value] = nameValue.split("=")
+
+      const cookie: Cookie = { name, value }
+
+      // Optional: Parse additional attributes from cookieParts
+      cookieParts.forEach((part) => {
+        const [key, val] = part.split("=")
+        switch (key.toLowerCase()) {
+          case "expires":
+            cookie.expires = new Date(val)
+            break
+          case "max-age":
+            cookie.maxAge = parseInt(val, 10)
+            break
+          case "domain":
+            cookie.domain = val
+            break
+          case "path":
+            cookie.path = val
+            break
+          case "secure":
+            cookie.secure = true
+            break
+          case "httponly":
+            cookie.httpOnly = true
+            break
+          case "partitioned":
+            cookie.partitioned = true
+            break
+          case "samesite":
+            cookie.sameSite = val as "Strict" | "Lax" | "None"
+            break
+          // Add more cases as needed for other attributes
+        }
+      })
+
+      this.setCookies.push(cookie)
+    }
+  }
 }
 
 /** Extracts cookies from the header as `Record`. */
@@ -194,6 +247,7 @@ export const parseFromCookie = (cookie: Cookie): string => {
   return out.join("; ")
 }
 
+// eslint-disable-next-line no-useless-escape
 const FIELD_CONTENT_REGEXP = /^(?=[\x20-\x7E]*$)[^()@<>,;:\\"\[\]?={}\s]+$/
 
 const validateName = (name: string | undefined | null) => {
@@ -209,7 +263,8 @@ const validatePath = (path: string | null) => {
   for (let i = 0; i < path.length; i++) {
     const c = path.charAt(i)
     if (
-      c < String.fromCharCode(0x20) || c > String.fromCharCode(0x7E) ||
+      c < String.fromCharCode(0x20) ||
+      c > String.fromCharCode(0x7e) ||
       c === ";"
     ) {
       throw new SyntaxError(
@@ -224,9 +279,12 @@ const validateValue = (name: string, value: string | null) => {
   for (let i = 0; i < value.length; i++) {
     const c = value.charAt(i)
     if (
-      c < String.fromCharCode(0x21) || c === String.fromCharCode(0x22) ||
-      c === String.fromCharCode(0x2c) || c === String.fromCharCode(0x3b) ||
-      c === String.fromCharCode(0x5c) || c === String.fromCharCode(0x7f)
+      c < String.fromCharCode(0x21) ||
+      c === String.fromCharCode(0x22) ||
+      c === String.fromCharCode(0x2c) ||
+      c === String.fromCharCode(0x3b) ||
+      c === String.fromCharCode(0x5c) ||
+      c === String.fromCharCode(0x7f)
     ) {
       throw new SyntaxError(
         "RFC2616 cookie '" + name + "' cannot contain character '" + c + "'",
@@ -234,7 +292,8 @@ const validateValue = (name: string, value: string | null) => {
     }
     if (c > String.fromCharCode(0x80)) {
       throw new SyntaxError(
-        "RFC2616 cookie '" + name +
+        "RFC2616 cookie '" +
+          name +
           "' can only have US-ASCII chars as value: It contains 0x" +
           c.charCodeAt(0).toString(16),
       )
@@ -246,8 +305,6 @@ const validateDomain = (domain: string) => {
   const char1 = domain.charAt(0)
   const charN = domain.charAt(domain.length - 1)
   if (char1 === "-" || charN === "." || charN === "-") {
-    throw new SyntaxError(
-      "Invalid first/last char in cookie domain: " + domain,
-    )
+    throw new SyntaxError("Invalid first/last char in cookie domain: " + domain)
   }
 }

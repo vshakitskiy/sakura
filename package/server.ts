@@ -21,21 +21,25 @@
  */
 
 import { Branch } from "./router.ts"
-import type { Method, Return } from "./utils.ts"
-import { SakuraError } from "./res.ts"
-import { fall } from "./res.ts"
+import type {
+  AfterHandler,
+  BeforeHandler,
+  ErrorHandler,
+  Method,
+  Return,
+  UnknownHandler,
+  UnsupportedHandler,
+} from "./utils.ts"
+import { fall, SakuraError } from "./res.ts"
 import type { PetalAny } from "./route.ts"
 import { Cookies } from "./cookies.ts"
 import { getQuery } from "./external.ts"
-import type { BeforeHandler, ErrorHandler } from "./external.ts"
+import type { StringRecord } from "./external.ts"
 
 /**
  * Creates request's inital seed.
  */
-export type GenSeed<Seed> = (
-  req: Request,
-  cookies: Cookies,
-) => Return<Seed>
+export type GenSeed<Seed> = (req: Request, cookies: Cookies) => Return<Seed>
 
 /**
  * Initialize branch function with the seed provided.
@@ -51,7 +55,9 @@ export type GenSeed<Seed> = (
  * }))
  * ```
  */
-export const sakura = <Seed>(seed: GenSeed<Seed>): {
+export const sakura = <Seed>(
+  seed: GenSeed<Seed>,
+): {
   seed: GenSeed<Seed>
   branch: () => Branch<Seed, Seed, PetalAny>
 } => ({
@@ -59,154 +65,120 @@ export const sakura = <Seed>(seed: GenSeed<Seed>): {
   branch: () => Branch.init<Seed>(),
 })
 
-/**
- * Starts server with the options provided.
- *
- * @example
- * ```ts
- * const mainBranch = branch().get("/", ({ req, seed }) => {
- *   // ...
- * })
- *
- * bloom({
- *   seed,
- *   branch: mainBranch,
- *   // ...
- * })
- * ```
- */
-export const bloom = <InitSeed, CurrSeed>({
-  seed: init,
-  branch,
-  port = 8000,
-  unknown,
-  error,
-  unsupported,
-  logger,
-  quiet,
-}: {
+type HandlerOptions<InitSeed, CurrSeed, B> = {
   seed: GenSeed<InitSeed>
   branch: Branch<InitSeed, CurrSeed, PetalAny>
-  port?: number
-  unknown?: BeforeHandler<InitSeed>
+  unsupported?: UnsupportedHandler<InitSeed>
+  unknown?: UnknownHandler<InitSeed>
   error?: ErrorHandler<InitSeed>
-  unsupported?: BeforeHandler<InitSeed>
-  logger?:
-    | (({ req, res, now }: {
-      req: Request
-      res: Response
-      now: number
-    }) => void)
-    | boolean
-  quiet?: boolean
-}): Deno.HttpServer<Deno.NetAddr> => {
+  before?: BeforeHandler<InitSeed, B>
+  after?: AfterHandler<B>
+}
+
+type Handler = <InitSeed, CurrSeed, B = never>({
+  seed,
+  branch,
+  error,
+  unknown,
+  unsupported,
+  before,
+  after,
+}: HandlerOptions<InitSeed, CurrSeed, B>) => (req: Request) => Promise<Response>
+
+export const handler: Handler = ({
+  seed: init,
+  branch,
+  error,
+  unknown,
+  unsupported,
+  before: bfr,
+  after,
+}) => {
   const matchFunc = branch.finalize()
-  return Deno.serve({
-    port,
-    onListen: () =>
-      quiet || console.log(
-        `%c🌸 Blooming on %chttp://localhost:${port}/`,
-        "color: pink",
-        "color: pink; font-weight: bold",
-      ),
-  }, async (req) => {
-    const now = Date.now()
+  return async (req: Request) => {
     const url = new URL(req.url)
     const method = req.method as Method
     const cookies = new Cookies(req)
+    const contentType = req.headers.get("Content-Type")
+    const initSeed = await init(req, cookies)
+    const before = bfr ? await bfr({ req, cookies, seed: initSeed }) : undefined
+    let res: Response
 
-    const resp = await (async () => {
-      const initSeed = await init(req, cookies)
-
-      try {
-        if (
-          req.headers.get("Content-Type") &&
-          req.headers.get("Content-Type") !== "application/json"
-        ) {
-          if (unsupported) return unsupported({ req, seed: initSeed })
-
-          console.log(
-            `%cWarning: unsupported Content-Type header`,
-            "color: yellow",
-          )
-        }
-
-        const match = matchFunc(req.method as Method, url.pathname)
-        if (!match) {
-          return unknown
-            ? unknown({ req, seed: initSeed })
-            : fall(404, { message: "not found" })
-        }
-
-        const { petal, params: rawParams } = match
-        const seed = await petal.mutation(initSeed)
-        let params = rawParams
-        if (petal.params) {
-          params = await petal.params.parse(params)
-        }
-
-        let query = getQuery(url)
-        if (petal.query) {
-          query = await petal.query.parse(query)
-        }
-
-        let body = undefined
-        if (method !== "GET") {
-          body = await getBody(req)
-          if (petal.body) body = await petal.body.parse(body)
-        }
-
-        return await petal.handler({
-          seed,
-          req,
-          params,
-          query,
-          body,
-          cookies,
-        })
-      } catch (err: unknown) {
-        if (err instanceof SakuraError) {
-          return fall(err.status, err.body, err.headers)
-        } else if (error) {
-          try {
-            return error({ error: err, seed: initSeed })
-          } catch (_) {
-            return fall(500, { message: "internal server error" })
-          }
-        } else return fall(500, { message: "internal server error" })
+    try {
+      if (contentType && contentType !== "application/json") {
+        if (unsupported)
+          return await unsupported({ req, seed: initSeed, cookies })
+        console.warn("Unsupported Content-Type header")
       }
-    })()
 
-    for (const cookie of cookies.parse()) {
-      resp.headers.append("Set-Cookie", cookie)
+      const match = matchFunc(method, url.pathname)
+      if (!match)
+        return unknown
+          ? await unknown({ req, cookies, seed: initSeed })
+          : fall(404, { message: "not found" })
+
+      const { petal, params: rawParams } = match
+      const seed = await petal.mutation(initSeed)
+
+      const promiseResolve = []
+      if (method !== "GET") {
+        const body = await getBody(req)
+        promiseResolve.push(
+          petal.body ? petal.body.parse(body) : Promise.resolve(body),
+        )
+      } else promiseResolve.push(Promise.resolve(undefined))
+      promiseResolve.push(
+        petal.params
+          ? petal.params.parse(rawParams)
+          : Promise.resolve(rawParams),
+      )
+      promiseResolve.push(
+        petal.query
+          ? petal.query.parse(getQuery(url))
+          : Promise.resolve(getQuery(url)),
+      )
+      const [body, params, query] = (await Promise.all(promiseResolve)) as [
+        body: any,
+        params: StringRecord,
+        query: StringRecord,
+      ]
+
+      res = await petal.handler({
+        seed,
+        req,
+        params,
+        query,
+        body,
+        cookies,
+      })
+    } catch (err: unknown) {
+      if (err instanceof SakuraError)
+        res = fall(err.status, err.body, err.headers)
+      else if (error)
+        try {
+          res = await error({ error: err, seed: initSeed })
+        } catch (_) {
+          res = fall(500, { message: "internal server error" })
+        }
+      else res = fall(500, { message: "internal server error" })
     }
 
-    if (logger) {
-      typeof logger === "boolean"
-        ? defaultLogger(now, req, resp, url)
-        : logger({ req, res: resp, now })
+    const parsedCookies = cookies.parse()
+    for (const cookie of parsedCookies) {
+      res.headers.append("Set-Cookie", cookie)
     }
 
-    return resp
-  })
+    return after ? await after({ res, before: before! }) : res
+  }
 }
 
 const getBody = (req: Request) => {
-  const isInvalid = !req.body ||
+  const isInvalid =
+    !req.body ||
     req.headers.get("Content-Length") === "0" ||
     !req.headers.get("Content-Type")
 
   if (isInvalid) return null
 
   return req.json()
-}
-
-const defaultLogger = (now: number, req: Request, res: Response, url: URL) => {
-  const ms = Date.now() - now
-  console.log(
-    `%c${req.method} %c${url.pathname} %c${res.status} ${ms}ms`,
-    "color: blue",
-    "color: #fff",
-    "color: green",
-  )
 }

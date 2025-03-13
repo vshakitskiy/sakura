@@ -9,7 +9,8 @@ const app = branch()
   .get("/ping", () =>
     fall(200, {
       message: "Pong.",
-    }))
+    }),
+  )
   .merge("/auth", auth)
 
 export const run = () => {

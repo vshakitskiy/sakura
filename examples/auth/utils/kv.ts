@@ -26,7 +26,8 @@ export class Kv {
       passwordHash,
     }
 
-    const result = await this.kv.atomic()
+    const result = await this.kv
+      .atomic()
       .check({ key: primaryKey, versionstamp: null })
       .check({ key: byEmailKey, versionstamp: null })
       .set(primaryKey, user)
@@ -40,11 +41,9 @@ export class Kv {
     return id
   }
 
-  public getUser = async (
-    id: string,
-  ) => (await this.kv.get<User>(["users", id])).value
+  public getUser = async (id: string) =>
+    (await this.kv.get<User>(["users", id])).value
 
-  public getUserByEmail = async (
-    email: string,
-  ) => (await this.kv.get<User>(["users_by_email", email])).value
+  public getUserByEmail = async (email: string) =>
+    (await this.kv.get<User>(["users_by_email", email])).value
 }
