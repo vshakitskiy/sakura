@@ -16,6 +16,7 @@ type Options<Method extends M> = Method extends "GET"
 type _Options = {
   body?: any
   cookies?: Record<string, string>
+  headers?: Record<string, string>
 }
 
 export type ClientOptions<SeedFrom> = {
@@ -141,6 +142,7 @@ const genRequest = <Method extends M>(
     method,
     headers: {
       "Content-Type": "application/json",
+      ...options?.headers,
     },
     body:
       method !== "GET"
