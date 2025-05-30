@@ -9,7 +9,11 @@ Sakura is a Deno HTTP framework build with zero dependencies and zod validation
 support, that grows organically, drawing inspiration from the graceful elegance
 of a cherry blossom tree.
 
-## Installation
+## TEMPORARY BROKEN
+
+This project is currently broken. I'm working on a new version of the framework that is more modular and easier to use.
+
+<!-- ## Installation
 
 Install Sakura in your Deno project using this command:
 
@@ -302,4 +306,4 @@ console.log(ping!.body) // { message: "pong" }
 
 const user = await client.post("/user", { body: { name: "Alice", age: 30 } })
 console.log(user!.body) // Contains the validated user data or an error message
-```
+``` -->

@@ -1,3 +1,4 @@
 .rest
 .dev
 node_modules
+.temp.ts

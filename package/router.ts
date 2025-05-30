@@ -1,352 +1,160 @@
-/**
- * Contains utilities for routing.
- *
- * @example
- * ```ts
- * import { Branch } from "@vsh/sakura"
- *
- * const match = Branch.create<{ req: Request }>()
- *  .get("/ping", () => fall(200, { message: "pong" }))
- *  .match("GET", "/ping")
- * ```
- * @module
- */
-import { toSchema } from "./external.ts"
-import type { PartialRecord, Schema, StringRecord } from "./external.ts"
-import type { Handler, Petal, PetalAny } from "./route.ts"
-import type { Method as M, SeedMutation } from "./utils.ts"
+import type { HttpMethod, ResponseState } from "./types.d.ts"
+import { status } from "./status.ts"
+import { Context } from "./context.ts"
 
-/** Finalized version of petal storaging used for faster pattern search. */
-export type RoutesTree<SeedFrom, SeedTo, Petals extends PetalAny> = {
-  next: Record<string, RoutesTree<SeedFrom, SeedTo, Petals>>
-  petals: PartialRecord<
-    M,
-    Petal<
-      SeedFrom,
-      SeedTo,
-      M,
-      Schema<any, any>,
-      Schema<any, any>,
-      Schema<any, any>
-    >
-  >
-  params: PartialRecord<M, string>
+export type RouteHandler<KV extends Record<string, any>> = (context: {
+  req: Request
+  ctx: Context<KV>
+  params: Record<string, string | undefined>
+}) => void | Promise<void> | Response | Promise<Response>
+
+export type MiddlewareHandler<
+  KV extends Record<string, any>,
+  NewKV extends Record<string, any>,
+> = (context: { ctx: Context<KV> }) => NewKV | Promise<NewKV>
+
+interface RoutePipelineStep<KV extends Record<string, any>> {
+  type: "route"
+  method: HttpMethod
+  pathPattern: URLPattern
+  handler: RouteHandler<KV>
 }
 
-const initNode = () => {
-  return {
-    next: {},
-    petals: {},
-    params: {},
+interface MiddlewarePipelineStep<
+  KV extends Record<string, any>,
+  NewKV extends Record<string, any>,
+> {
+  type: "middleware"
+  mw: MiddlewareHandler<KV, NewKV>
+}
+
+type PipelineStep = RoutePipelineStep<any> | MiddlewarePipelineStep<any, any>
+
+export class Router<KV extends Record<string, any>> {
+  public pipeline: PipelineStep[] = []
+  private kv: KV
+
+  constructor(kv?: KV) {
+    this.kv = kv || ({} as KV)
   }
-}
 
-/** Contains Zod schemas to parse request metadata to required type. Ignore if you are not planning to use Zod. */
-export type Schemas<
-  Body extends Schema,
-  Params extends Schema,
-  Query extends Schema,
-> = {
-  body?: Body
-  params?: Params
-  query?: Query
-}
-
-/** Function that returns petal and compiled parameters based on the method and path provided. */
-export type Match<SeedFrom, SeedTo> = (
-  method: M,
-  path: string,
-) => {
-  petal: Petal<
-    SeedFrom,
-    SeedTo,
-    M,
-    Schema<any, any>,
-    Schema<any, any>,
-    Schema<any, any>
-  >
-  params: StringRecord
-} | null
-
-type OnMethod<Method extends M, SeedFrom, SeedTo, Petals extends PetalAny> = <
-  Body extends Schema = never,
-  Params extends Schema = never,
-  Query extends Schema = never,
->(
-  path: string,
-  handler: Handler<SeedTo, Method, Body, Params, Query>,
-  schemas?: Method extends "GET"
-    ? Omit<Schemas<Body, Params, Query>, "body">
-    : Schemas<Body, Params, Query>,
-) => Branch<
-  SeedFrom,
-  SeedTo,
-  Petals | Petal<SeedFrom, SeedTo, M, Body, Params, Query>
->
-
-/**
- * Creates new branch that appends to the blooming sakura later.
- *
- * @example
- * ```ts
- * const raw = Branch.init<{ req: Request }>
- *
- * // Recommended
- * const { seed, branch } = sakura((req) => ({ req }))
- * const main = branch().get("/", () => fall(418))
- *
- * bloom({
- *   seed,
- *   branch: main
- *   // ...
- * })
- * ```
- */
-export class Branch<SeedFrom, SeedTo, Petals extends PetalAny> {
-  // @TODO: fill examples in jsdoc
-
-  /**
-   * Set of petals.
-   */
-  public petals: Set<Petals>
-
-  /**
-   * Mutates initial seed into the latest form of seed.
-   */
-  public mutation: SeedMutation<SeedFrom, SeedTo>
-
-  /**
-   * Creates empty branch with basic mutation function.
-   */
-  public static init = <SeedInit>(): Branch<SeedInit, SeedInit, PetalAny> =>
-    new Branch<SeedInit, SeedInit, PetalAny>({
-      petals: new Set(),
-      mutation: (seed) => seed,
+  private addRoute = (
+    method: HttpMethod,
+    path: string,
+    handler: RouteHandler<KV>,
+  ): this => {
+    this.pipeline.push({
+      type: "route",
+      method,
+      pathPattern: new URLPattern({ pathname: path }),
+      handler,
     })
 
-  constructor({
-    petals,
-    mutation,
-  }: {
-    petals: Set<Petals>
-    mutation: SeedMutation<SeedFrom, SeedTo>
-  }) {
-    this.petals = petals
-    this.mutation = mutation
+    return this
   }
 
-  /**
-   * Updates mutation function that will mutate the last form of the seed.
-   */
-  public with = <SeedNext>(
-    mutation: SeedMutation<SeedTo, SeedNext>,
-  ): Branch<SeedFrom, SeedNext, Petals> =>
-    new Branch<SeedFrom, SeedNext, Petals>({
-      petals: this.petals,
-      mutation: async (seed) => mutation(await this.mutation(seed)),
+  get(path: string, handler: RouteHandler<KV>): this {
+    return this.addRoute("GET", path, handler)
+  }
+
+  post(path: string, handler: RouteHandler<KV>): this {
+    return this.addRoute("POST", path, handler)
+  }
+
+  put(path: string, handler: RouteHandler<KV>): this {
+    return this.addRoute("PUT", path, handler)
+  }
+
+  delete(path: string, handler: RouteHandler<KV>): this {
+    return this.addRoute("DELETE", path, handler)
+  }
+
+  patch(path: string, handler: RouteHandler<KV>): this {
+    return this.addRoute("PATCH", path, handler)
+  }
+
+  with = <NextKV extends Record<string, any>>(
+    mw: MiddlewareHandler<KV, NextKV>,
+  ): Router<NextKV> => {
+    this.pipeline.push({
+      type: "middleware",
+      mw,
     })
 
-  private method =
-    <Method extends M>(
-      method: Method,
-    ): OnMethod<Method, SeedFrom, SeedTo, Petals> =>
-    (path, handler, schemas?) =>
-      this._append(method, path, handler, schemas)
-
-  /**
-   * Corresponds to the GET http method.
-   */
-  public get: OnMethod<"GET", SeedFrom, SeedTo, Petals> = this.method("GET")
-
-  /**
-   * Corresponds to the POST http method.
-   */
-  public post: OnMethod<"POST", SeedFrom, SeedTo, Petals> = this.method("POST")
-
-  /**
-   * Corresponds to the PUT http method.
-   */
-  public put: OnMethod<"PUT", SeedFrom, SeedTo, Petals> = this.method("PUT")
-
-  /**
-   * Corresponds to the PATCH http method.
-   */
-  public patch: OnMethod<"PATCH", SeedFrom, SeedTo, Petals> =
-    this.method("PATCH")
-
-  /**
-   * Corresponds to the DELETE http method.
-   */
-  public delete: OnMethod<"DELETE", SeedFrom, SeedTo, Petals> =
-    this.method("DELETE")
-
-  /**
-   * Merges one branch into another by prefix. Mutations of each other are not affected.
-   */
-  public merge = <Prefix extends `/${string}`, DiffR extends PetalAny>(
-    prefix: Prefix,
-    branch: Branch<SeedFrom, any, DiffR>,
-  ): Branch<SeedFrom, SeedTo, Petals> => {
-    const toAppend = [...branch.petals].map((petal) => ({
-      ...petal,
-      path: `${prefix}${petal.path}`,
-    }))
-
-    return new Branch({
-      petals: new Set([...this.petals, ...toAppend]),
-      mutation: this.mutation,
-    }) as Branch<SeedFrom, SeedTo, Petals>
+    return this as unknown as Router<NextKV>
   }
 
-  /**
-   * Returns match function to search petal by method and path.
-   */
-  public finalize = (): Match<SeedFrom, SeedTo> => {
-    const node: RoutesTree<SeedFrom, SeedTo, Petals> = {
-      next: {},
-      petals: {},
-      params: {},
+  join = (...routes: Router<KV>[]): Router<KV> => {
+    const router = new Router<KV>()
+    router.pipeline = [...this.pipeline]
+
+    for (const route of routes) {
+      router.pipeline.push(...route.pipeline)
     }
 
-    for (const petal of this.petals) {
-      this._appendNode(node, petal)
-    }
-    return (method, path) => this._matchTree(node, method, path)
+    return router
   }
 
-  /**
-   * Returns match function to search petal by method and path.
-   * @deprecated use finalize() instead, since _finalize() uses slower match algorithm.
-   */
-  public _finalize = (): Match<SeedFrom, SeedTo> => {
-    const routes = new Map<string, Map<M, PetalAny>>()
-
-    for (const route of this.petals) {
-      if (!routes.has(route.path)) {
-        routes.set(route.path, new Map())
+  handler = (): ((req: Request) => Promise<Response>) => {
+    return async (req: Request): Promise<Response> => {
+      const url = new URL(req.url)
+      const res: ResponseState = {
+        active: false,
+        body: "Not Found",
+        status: status.notFound,
+        headers: new Headers({ "Content-Type": "text/plain;charset=utf-8" }),
       }
 
-      routes.get(route.path)!.set(route.method, route)
-    }
+      const ctx = new Context(req, { ...this.kv }, res)
 
-    return (method: M, path: string) => this._matchMap(routes, method, path)
-  }
+      try {
+        for (const step of this.pipeline) {
+          if (step.type === "middleware") {
+            const newKV = await step.mw({ ctx })
+            ctx.kv = newKV
 
-  private _appendNode = (
-    root: RoutesTree<SeedFrom, SeedTo, Petals>,
-    petal: Petals,
-  ) => {
-    const parts = petal.path.split("/").filter(Boolean)
-    let node = root
+            if (ctx.res.active) {
+              return new Response(ctx.res.body, {
+                status: ctx.res.status,
+                headers: ctx.res.headers,
+              })
+            }
+          } else if (step.type === "route") {
+            const match = step.pathPattern.exec({ pathname: url.pathname })
 
-    for (const part of parts) {
-      const isParam = part.startsWith(":")
-      const key = isParam ? ":" : part
+            if (match && req.method === step.method) {
+              ctx.params = match.pathname.groups
 
-      if (!node.next[key]) node.next[key] = initNode()
-      node = node.next[key]
+              const handlerRes = await step.handler({
+                req,
+                ctx,
+                params: match.pathname.groups,
+              })
 
-      if (isParam) node.params[petal.method] = part.slice(1)
-    }
+              if (handlerRes instanceof Response) {
+                return handlerRes
+              }
 
-    node.petals[petal.method] = petal
-  }
-
-  private _matchTree = (
-    tree: RoutesTree<SeedFrom, SeedTo, Petals>,
-    method: M,
-    path: string,
-  ) => {
-    let node = tree
-    const parts = path.split("/").filter(Boolean)
-    const params: StringRecord = {}
-
-    for (const part of parts) {
-      if (node.next[part]) node = node.next[part]
-      else if (node.next[":"]) {
-        node = node.next[":"]
-        params[node.params[method]!] = part
-      } else return null
-    }
-
-    return node.petals[method]
-      ? {
-          petal: node.petals[method],
-          params,
-        }
-      : null
-  }
-
-  private _matchMap(
-    routes: Map<string, Map<M, PetalAny>>,
-    method: M,
-    path: string,
-  ) {
-    const pathSegments = path.split("/").filter(Boolean)
-    let params: Record<string, string> = {}
-
-    for (const [routePath, handlers] of routes) {
-      params = {}
-      const routeSegments = routePath.split("/").filter(Boolean)
-
-      if (routeSegments.length !== pathSegments.length) continue
-
-      let matches = true
-      for (let i = 0; i < routeSegments.length; i++) {
-        const routeSegment = routeSegments[i]
-        const pathSegment = pathSegments[i]
-
-        if (routeSegment && pathSegment && routeSegment.startsWith(":")) {
-          params[routeSegment.slice(1)] = pathSegment
-        } else if (routeSegment !== pathSegment) {
-          matches = false
-          break
-        }
-      }
-
-      if (matches) {
-        const petal = handlers.get(method)
-        if (petal) {
-          return {
-            petal,
-            params,
+              return new Response(ctx.res.body, {
+                status: ctx.res.status,
+                headers: ctx.res.headers,
+              })
+            }
           }
         }
+
+        return new Response(res.body, {
+          status: res.status,
+          headers: res.headers,
+        })
+      } catch (err) {
+        console.log("[Sakura Framework Error]", err)
+
+        return new Response("Internal Server Error", {
+          status: status.internalServerError,
+          headers: new Headers({ "Content-Type": "text/plain;charset=utf-8" }),
+        })
       }
     }
-
-    return null
-  }
-
-  private _append = <
-    Method extends M,
-    Body extends Schema = never,
-    Params extends Schema = never,
-    Query extends Schema = never,
-  >(
-    method: Method,
-    path: string,
-    handler: Handler<SeedTo, Method, Body>,
-    schemas?: Schemas<Body, Params, Query>,
-  ) => {
-    const petal = {
-      mutation: this.mutation,
-      method,
-      path,
-      handler,
-      body: schemas?.body?.parse ? toSchema(schemas.body.parse) : undefined,
-      params: schemas?.params?.parse
-        ? toSchema(schemas.params.parse)
-        : undefined,
-      query: schemas?.query?.parse ? toSchema(schemas.query.parse) : undefined,
-    } as Petal<SeedFrom, SeedTo, M, Body, Params, Query>
-
-    return new Branch({
-      petals: new Set([...this.petals, petal]),
-      mutation: this.mutation,
-    })
   }
 }
-
-/** Branch type with unknown seed. */
-export type BranchAny = Branch<unknown, unknown, PetalAny>
